@@ -1,9 +1,14 @@
+import 'package:flowy_infra/utils/color_converter.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flowy_infra/theme.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 import 'default_colorscheme.dart';
 import 'dandelion.dart';
 import 'lavender.dart';
+import 'lemonade.dart';
+
+part 'colorscheme.g.dart';
 
 /// A map of all the built-in themes.
 ///
@@ -19,14 +24,22 @@ const Map<String, List<FlowyColorScheme>> themeMap = {
     DandelionColorScheme.light(),
     DandelionColorScheme.dark(),
   ],
+  BuiltInTheme.lemonade: [
+    LemonadeColorScheme.light(),
+    LemonadeColorScheme.dark(),
+  ],
   BuiltInTheme.lavender: [
     LavenderColorScheme.light(),
     LavenderColorScheme.dark(),
   ],
 };
 
-@immutable
-abstract class FlowyColorScheme {
+@JsonSerializable(
+  converters: [
+    ColorConverter(),
+  ],
+)
+class FlowyColorScheme {
   final Color surface;
   final Color hover;
   final Color selector;
@@ -77,7 +90,9 @@ abstract class FlowyColorScheme {
   //editor toolbar BG color
   final Color toolbarColor;
   final Color toggleButtonBGColor;
-
+  final Color calendarWeekendBGColor;
+  //grid bottom count color
+  final Color gridRowCountColor;
   const FlowyColorScheme({
     required this.surface,
     required this.hover,
@@ -125,14 +140,12 @@ abstract class FlowyColorScheme {
     required this.progressBarBGColor,
     required this.toolbarColor,
     required this.toggleButtonBGColor,
+    required this.calendarWeekendBGColor,
+    required this.gridRowCountColor,
   });
 
-  factory FlowyColorScheme.builtIn(String themeName, Brightness brightness) {
-    switch (brightness) {
-      case Brightness.light:
-        return themeMap[themeName]?[0] ?? const DefaultColorScheme.light();
-      case Brightness.dark:
-        return themeMap[themeName]?[1] ?? const DefaultColorScheme.dark();
-    }
-  }
+  factory FlowyColorScheme.fromJson(Map<String, dynamic> json) =>
+      _$FlowyColorSchemeFromJson(json);
+
+  Map<String, dynamic> toJson() => _$FlowyColorSchemeToJson(this);
 }

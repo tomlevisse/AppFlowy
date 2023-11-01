@@ -1,33 +1,46 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { nanoid } from 'nanoid';
-import { WorkspaceSettingPB } from '@/services/backend/models/flowy-folder/workspace';
+import { WorkspaceSettingPB } from '@/services/backend/models/flowy-folder2/workspace';
+import { UserSetting } from '$app/interfaces';
 
 export interface ICurrentUser {
-  id?: string;
+  id?: number;
   displayName?: string;
   email?: string;
   token?: string;
   isAuthenticated: boolean;
   workspaceSetting?: WorkspaceSettingPB;
+  userSetting: UserSetting;
 }
 
 const initialState: ICurrentUser | null = {
   isAuthenticated: false,
+  userSetting: {},
 };
 
 export const currentUserSlice = createSlice({
   name: 'currentUser',
   initialState: initialState,
   reducers: {
-    checkUser: (state, action: PayloadAction<ICurrentUser>) => {
-      return action.payload;
+    checkUser: (state, action: PayloadAction<Partial<ICurrentUser>>) => {
+      return {
+        ...state,
+        ...action.payload,
+      };
     },
-    updateUser: (state, action: PayloadAction<ICurrentUser>) => {
-      return action.payload;
+    updateUser: (state, action: PayloadAction<Partial<ICurrentUser>>) => {
+      return {
+        ...state,
+        ...action.payload,
+      };
     },
     logout: () => {
-      return {
-        isAuthenticated: false,
+      return initialState;
+    },
+    setUserSetting: (state, action: PayloadAction<Partial<UserSetting>>) => {
+      state.userSetting = {
+        ...state.userSetting,
+        ...action.payload,
       };
     },
   },

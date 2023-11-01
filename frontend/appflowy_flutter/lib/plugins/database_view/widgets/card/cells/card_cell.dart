@@ -1,8 +1,10 @@
 import 'package:appflowy/plugins/database_view/application/cell/cell_service.dart';
+import 'package:appflowy/plugins/database_view/application/row/row_service.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/date_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pbenum.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/select_option.pb.dart';
 import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/date_type_option_entities.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/field_entities.pbenum.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/select_type_option.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/timestamp_entities.pb.dart';
 import 'package:flutter/material.dart';
 
 typedef CellRenderHook<C, CustomCardData> = Widget? Function(
@@ -47,6 +49,16 @@ class RowCardRenderHook<CustomCardData> {
     CellRenderHook<DateCellDataPB, CustomCardData?> hook,
   ) {
     renderHook[FieldType.DateTime] = _typeSafeHook<DateCellDataPB>(hook);
+  }
+
+  /// Add a render hook for [FieldType.LastEditedTime] and [FieldType.CreatedTime]
+  void addTimestampCellHook(
+    CellRenderHook<TimestampCellDataPB, CustomCardData?> hook,
+  ) {
+    renderHook[FieldType.LastEditedTime] =
+        _typeSafeHook<TimestampCellDataPB>(hook);
+    renderHook[FieldType.CreatedTime] =
+        _typeSafeHook<TimestampCellDataPB>(hook);
   }
 
   CellRenderHook<dynamic, CustomCardData> _typeSafeHook<C>(
@@ -105,7 +117,7 @@ class EditableRowNotifier {
       : isEditing = ValueNotifier(isEditing);
 
   void bindCell(
-    CellIdentifier cellIdentifier,
+    DatabaseCellContext cellIdentifier,
     EditableCardNotifier notifier,
   ) {
     assert(
@@ -156,7 +168,7 @@ class EditableRowNotifier {
   }
 }
 
-abstract class EditableCell {
+abstract mixin class EditableCell {
   // Each cell notifier will be bind to the [EditableRowNotifier], which enable
   // the row notifier receive its cells event. For example: begin editing the
   // cell or end editing the cell.
@@ -166,11 +178,12 @@ abstract class EditableCell {
 
 class EditableCellId {
   String fieldId;
-  String rowId;
+  RowId rowId;
 
   EditableCellId(this.rowId, this.fieldId);
 
-  factory EditableCellId.from(CellIdentifier cellIdentifier) => EditableCellId(
+  factory EditableCellId.from(DatabaseCellContext cellIdentifier) =>
+      EditableCellId(
         cellIdentifier.rowId,
         cellIdentifier.fieldId,
       );

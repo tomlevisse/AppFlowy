@@ -1,24 +1,296 @@
 # Release Notes
 
+## Version 0.3.7 - 10/30/2023
+
+### New Features
+- Support showing checklist items inline in row page.
+- Support inserting date from slash menu.
+- Support renaming a stack directly by clicking on the stack name.
+- Show the detailed reminder content in the notification center.
+- Save card order in Board view.
+- Allow to hide the ungrouped stack.
+- Segmented the checklist progress bar.
+
+### Bug fixes
+- Optimize side panel animation.
+- Fix calendar with hidden date or title doesn't show options correctly.
+- Fix the horizontal scroll bar disappears in Grid view.
+- Improve setting tab UI in Grid view.
+- Improve theme of the code block.
+- Fix some UI issues.
+
+## Version 0.3.6 - 10/16/2023
+
+### New Features
+- Support setting Markdown styles through keyboard shortcuts.
+- Added Ukrainian language.
+- Support auto-hiding sidebar feature, ensuring a streamlined view even when resizing to a smaller window.
+- Support toggling the notifitcation on/off.
+- Added Lemonade theme.
+
+### Bug fixes
+- Improve Vietnamese translations.
+- Improve reminder feature.
+- Fix some UI issues.
+
+## Version 0.3.5 - 10/09/2023
+
+### New Features
+- Added support for browsing and inserting images from Unsplash.
+- Revamp and unify the emoji picker throughout AppFlowy.
+
+### Bug fixes
+- Improve layout of the settings page.
+- Improve design of the restore page banner.
+- Improve UX of the reminders.
+- Other UI fixes.
+
+## Version 0.3.4 - 10/02/2023
+
+### New Features
+- Added support for creating a reminder.
+- Added support for finding and replacing in the document page.
+- Added support for showing the hidden fields in row detail page.
+- Adjust the toolbar style in RTL mode.
+
+### Bug fixes
+- Improve snackbar UI design.
+- Improve dandelion theme.
+- Improve id-ID and pl-PL language translations.
+
+## Version 0.3.3 - 09/24/2023
+
+### New Features
+- Added an end date field to the time cell in the database.
+- Added Support for customizing the font family from GoogleFonts in the editor.
+- Set the uploaded image to cover by default.
+- Added Support for resetting the user icon on settings page
+- Add Urdu language translations.
+
+### Bug fixes
+- Default colors for the blocks except for the callout were not transparent.
+- Option/Alt + click to add a block above didn't work on the first line.
+- Unable to paste HTML content containing `<mark>` tag.
+- Unable to select the text from anywhere in the line.
+- The selection in the editor didn't clear when editing the inline database.
+- Added a bottom border to new property column in the database.
+- Set minimum width of 50px for grid fields.
+
+## Version 0.3.2 - 09/18/2023
+
+### New Features
+
+- Improve the performance of the editor, now it is much faster when editing a large document.
+- Support for reordering the rows of the database on Windows.
+- Revamp the row detail page of the database.
+- Revamp the checklist cell editor of the database.
+
+### Bug fixes
+
+- Some UI issues
+
+## Version 0.3.1 - 09/04/2023
+
+### New Features
+
+- Improve CJK (Chinese, Japanese, Korean) input method support.
+- Share a database in CSV format.
+- Support for aligning the block component with the toolbar.
+- Support for editing name when creating a new page.
+- Support for inserting a table in the document page.
+- Database views allow for independent field visibility toggling.
+
+### Bug fixes
+
+- Paste multiple lines in code block.
+- Some UI issues
+
+## Version 0.3.0 - 08/22/2023
+
+### New Features
+
+- Improve paste features:
+  - Paste HTML content from website.
+  - Paste image from clipboard.
+
+- Support Group by Date in Kanban Board.
+- Notarize the macOS package, which is now verified by Apple.
+- Add Persian language translations.
+
+### Bug fixes
+
+- Some UI issues
+
+## Version 0.2.9 - 08/08/2023
+
+### New Features
+
+- Improve tab and shortcut, click with alt/option to open a page in new tab.
+- Improve database tab bar UI.
+
+### Bug fixes
+
+- Add button and more action button of the favorite section doesn't work.
+- Fix euro currency number format.
+- Some UI issues
+
+## Version 0.2.8 - 08/03/2023
+
+### New Features
+
+- Nestable personal folder that supports drag and drop
+- Support for favorite folders.
+- Support for sorting by date in Grid view.
+- Add a duplicate button in the Board context menu.
+
+### Bug fixes
+
+- Improve readability in Callout
+- Some UI issues
+
+## Version 0.2.7 - 07/18/2023
+
+### New Features
+
+<img width="1147" src="https://github.com/AppFlowy-IO/AppFlowy/assets/11863087/ac464740-c685-4a85-ae99-1074c1c607e5">
+
+- Open page in new tab
+- Create toggle lists to keep things tidy in your pages
+- Alt/Option + click to add a text block above
+
+### Bug fixes
+
+- Pasting into a Grid property crashed on Windows
+- Double-click a link to open
+
+## Version 0.2.6 - 07/11/2023
+
+### New Features
+
+- Dynamic load themes
+- Inline math equation
+
+
+## Version 0.2.5 - 07/02/2023
+
+### New Features
+
+- Insert local images
+- Mention a page
+- Outlines (Table of contents)
+- Added support for aligning the image by image menu
+
+### Bug fixes
+
+- Some UI issues
+
+## Version 0.2.4 - 06/23/2023
+
+### Bug fixes:
+
+- Unable to copy and paste a word
+- Some UI issues
+
+## Version 0.2.3 - 06/21/2023
+
+### New Features
+
+- Added support for creating multiple database views for existing database
+
+## Version 0.2.2 - 06/15/2023
+
+### New Features
+
+- Added support for embedding a document in the database's row detail page
+- Added support for inserting an emoji in the database's row detail page
+
+### Other Updates
+
+- Added language selector on the welcome page
+- Added support for importing multiple markdown files all at once
+
+## Version 0.2.1 - 06/11/2023
+
+### New Features
+
+- Added support for creating or referencing a calendar in the document
+- Added `+` icon in grid's add field
+
+### Other Updates
+
+- Added vertical padding for progress bar
+- Hide url cell accessory when the content is empty
+
+### Bug fixes:
+
+- Fixed unable to export markdown
+- Fixed adding vertical padding for progress bar
+- Fixed database view didn't update after the database layout changed.
+
+## Version 0.2.0 - 06/08/2023
+
+### New Features
+
+- Improved checklists to support each cell having its own list
+- Drag and drop calendar events
+- Switch layouts (calendar, grid, kanban) of a database
+- New database properties: 'Updated At' and 'Created At'
+- Enabled hiding properties on the row detail page
+- Added support for reordering and saving row order in different database views.
+- Enabled each database view to have its own settings, including filter and sort options
+- Added support to convert `“` (double quote) into a block quote
+- Added support to convert `***` (three stars) into a divider
+- Added support for an 'Add' button to insert a paragraph in a document and display the slash menu
+- Added support for an 'Option' button to delete, duplicate, and customize block actions
+
+### Other Updates
+
+- Added support for importing v0.1.x documents and databases
+- Added support for database import and export to CSV
+- Optimized scroll behavior in documents.
+- Redesigned the launch page
+
+### Bug fixes
+
+- Fixed bugs related to numbers
+- Fixed issues with referenced databases in documents
+- Fixed menu overflow issues in documents
+
+### Data migration
+
+The data format of this version is not compatible with previous versions. Therefore, to migrate your data to the new version, you need to use the export and import functions. Please follow the guide to learn how to export and import your data.
+
+#### Export files in v0.1.6
+
+https://github.com/AppFlowy-IO/AppFlowy/assets/11863087/0c89bf2b-cd97-4a7b-b627-59df8d2967d9
+
+#### Import files in v0.2.0
+
+https://github.com/AppFlowy-IO/AppFlowy/assets/11863087/7b392f35-4972-497a-8a7f-f38efced32e2
+
 ## Version 0.1.5 - 11/05/2023
 
 ### Bug Fixes
+
 - Fix: calendar dates don't match with weekdays.
 - Fix: sort numbers in Grid.
 
 ## Version 0.1.4 - 04/05/2023
 
 ### New features
+
 - Use AppFlowy’s calendar views to plan and manage tasks and deadlines.
 - Writing can be improved with the help of OpenAI.
 
 ## Version 0.1.3 - 24/04/2023
 
 ### New features
+
 - Launch the official Dark Mode.
 - Customize the font color and highlight color by setting a hex color value and an opacity level.
 
 ### Bug Fixes
+
 - Fix: the slash menu can be triggered by all other keyboards than English.
 - Fix: convert the single asterisk to italic text and the double asterisks to bold text.
 

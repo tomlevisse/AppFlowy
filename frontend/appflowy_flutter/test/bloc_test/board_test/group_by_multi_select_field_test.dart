@@ -1,8 +1,9 @@
 import 'package:appflowy/plugins/database_view/application/cell/cell_controller_builder.dart';
+import 'package:appflowy/plugins/database_view/application/database_controller.dart';
 import 'package:appflowy/plugins/database_view/application/setting/group_bloc.dart';
 import 'package:appflowy/plugins/database_view/board/application/board_bloc.dart';
 import 'package:appflowy/plugins/database_view/widgets/row/cells/select_option_cell/select_option_editor_bloc.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/field_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pb.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'util.dart';
@@ -26,7 +27,7 @@ void main() {
     // set grouped by the new multi-select field"
     final gridGroupBloc = DatabaseGroupBloc(
       viewId: context.gridView.id,
-      fieldController: context.fieldController,
+      databaseController: context.databaseController,
     )..add(const DatabaseGroupEvent.initial());
     await boardResponseFuture();
 
@@ -38,9 +39,11 @@ void main() {
     );
     await boardResponseFuture();
 
-    //assert only have the 'No status' group
-    final boardBloc = BoardBloc(view: context.gridView)
-      ..add(const BoardEvent.initial());
+    // assert only have the 'No status' group
+    final boardBloc = BoardBloc(
+      view: context.gridView,
+      databaseController: DatabaseController(view: context.gridView),
+    )..add(const BoardEvent.initial());
     await boardResponseFuture();
     assert(
       boardBloc.groupControllers.values.length == 1,
@@ -48,8 +51,9 @@ void main() {
     );
     final expectedGroupName = "No ${multiSelectField.name}";
     assert(
-      boardBloc.groupControllers.values.first.group.desc == expectedGroupName,
-      "Expected $expectedGroupName, but receive ${boardBloc.groupControllers.values.first.group.desc}",
+      boardBloc.groupControllers.values.first.group.groupName ==
+          expectedGroupName,
+      "Expected $expectedGroupName, but receive ${boardBloc.groupControllers.values.first.group.groupName}",
     );
   });
 
@@ -78,7 +82,7 @@ void main() {
     // set grouped by the new multi-select field"
     final gridGroupBloc = DatabaseGroupBloc(
       viewId: context.gridView.id,
-      fieldController: context.fieldController,
+      databaseController: context.databaseController,
     )..add(const DatabaseGroupEvent.initial());
     await boardResponseFuture();
 
@@ -91,8 +95,10 @@ void main() {
     await boardResponseFuture();
 
     // assert there are only three group
-    final boardBloc = BoardBloc(view: context.gridView)
-      ..add(const BoardEvent.initial());
+    final boardBloc = BoardBloc(
+      view: context.gridView,
+      databaseController: DatabaseController(view: context.gridView),
+    )..add(const BoardEvent.initial());
     await boardResponseFuture();
     assert(
       boardBloc.groupControllers.values.length == 3,
@@ -101,8 +107,8 @@ void main() {
 
     final groups =
         boardBloc.groupControllers.values.map((e) => e.group).toList();
-    assert(groups[0].desc == "No ${multiSelectField.name}");
-    assert(groups[1].desc == "B");
-    assert(groups[2].desc == "A");
+    assert(groups[0].groupName == "B");
+    assert(groups[1].groupName == "A");
+    assert(groups[2].groupName == "No ${multiSelectField.name}");
   });
 }

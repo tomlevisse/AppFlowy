@@ -6,7 +6,7 @@ enum AccessoryType {
   more,
 }
 
-abstract class CardAccessory implements Widget {
+abstract mixin class CardAccessory implements Widget {
   AccessoryType get type;
   void onTap(BuildContext context) {}
 }
@@ -66,7 +66,10 @@ class CardAccessoryContainer extends StatelessWidget {
     return Container(
       clipBehavior: Clip.hardEdge,
       decoration: decoration,
-      child: child,
+      child: ClipRRect(
+        borderRadius: const BorderRadius.all(Radius.circular(4)),
+        child: child,
+      ),
     );
   }
 }

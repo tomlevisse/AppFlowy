@@ -1,64 +1,88 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
-mod c;
-mod model;
-mod notification;
-mod protobuf;
-mod util;
 
+use std::sync::Arc;
+use std::{ffi::CStr, os::raw::c_char};
+
+use lazy_static::lazy_static;
+use log::error;
+use parking_lot::Mutex;
+use tracing::trace;
+
+use flowy_core::*;
+use flowy_notification::{register_notification_sender, unregister_all_notification_sender};
+use lib_dispatch::prelude::ToBytes;
+use lib_dispatch::prelude::*;
+
+use crate::env_serde::AppFlowyEnv;
 use crate::notification::DartNotificationSender;
 use crate::{
   c::{extend_front_four_bytes_into_bytes, forget_rust},
   model::{FFIRequest, FFIResponse},
 };
-use flowy_core::get_client_server_configuration;
-use flowy_core::*;
-use flowy_notification::register_notification_sender;
-use lazy_static::lazy_static;
-use lib_dispatch::prelude::ToBytes;
-use lib_dispatch::prelude::*;
-use parking_lot::RwLock;
-use std::{ffi::CStr, os::raw::c_char};
+
+mod c;
+mod env_serde;
+mod model;
+mod notification;
+mod protobuf;
+mod util;
 
 lazy_static! {
-  static ref APPFLOWY_CORE: RwLock<Option<AppFlowyCore>> = RwLock::new(None);
+  static ref APPFLOWY_CORE: MutexAppFlowyCore = MutexAppFlowyCore::new();
 }
+
+struct MutexAppFlowyCore(Arc<Mutex<Option<AppFlowyCore>>>);
+
+impl MutexAppFlowyCore {
+  fn new() -> Self {
+    Self(Arc::new(Mutex::new(None)))
+  }
+
+  fn dispatcher(&self) -> Option<Arc<AFPluginDispatcher>> {
+    let binding = self.0.lock();
+    let core = binding.as_ref();
+    core.map(|core| core.event_dispatcher.clone())
+  }
+}
+
+unsafe impl Sync for MutexAppFlowyCore {}
+unsafe impl Send for MutexAppFlowyCore {}
 
 #[no_mangle]
 pub extern "C" fn init_sdk(path: *mut c_char) -> i64 {
   let c_str: &CStr = unsafe { CStr::from_ptr(path) };
   let path: &str = c_str.to_str().unwrap();
 
-  let server_config = get_client_server_configuration().unwrap();
   let log_crates = vec!["flowy-ffi".to_string()];
-  let config = AppFlowyCoreConfig::new(path, DEFAULT_NAME.to_string(), server_config)
-    .log_filter("info", log_crates);
-  *APPFLOWY_CORE.write() = Some(AppFlowyCore::new(config));
-
+  let config =
+    AppFlowyCoreConfig::new(path, DEFAULT_NAME.to_string()).log_filter("info", log_crates);
+  *APPFLOWY_CORE.0.lock() = Some(AppFlowyCore::new(config));
   0
 }
 
 #[no_mangle]
+#[allow(clippy::let_underscore_future)]
 pub extern "C" fn async_event(port: i64, input: *const u8, len: usize) {
   let request: AFPluginRequest = FFIRequest::from_u8_pointer(input, len).into();
-  log::trace!(
+  trace!(
     "[FFI]: {} Async Event: {:?} with {} port",
     &request.id,
     &request.event,
     port
   );
 
-  let dispatcher = match APPFLOWY_CORE.read().as_ref() {
+  let dispatcher = match APPFLOWY_CORE.dispatcher() {
     None => {
-      log::error!("sdk not init yet.");
+      error!("sdk not init yet.");
       return;
     },
-    Some(e) => e.event_dispatcher.clone(),
+    Some(dispatcher) => dispatcher,
   };
-  let _ = AFPluginDispatcher::async_send_with_callback(
+  AFPluginDispatcher::boxed_async_send_with_callback(
     dispatcher,
     request,
     move |resp: AFPluginEventResponse| {
-      log::trace!("[FFI]: Post data to dart through {} port", port);
+      trace!("[FFI]: Post data to dart through {} port", port);
       Box::pin(post_to_flutter(resp, port))
     },
   );
@@ -67,14 +91,14 @@ pub extern "C" fn async_event(port: i64, input: *const u8, len: usize) {
 #[no_mangle]
 pub extern "C" fn sync_event(input: *const u8, len: usize) -> *const u8 {
   let request: AFPluginRequest = FFIRequest::from_u8_pointer(input, len).into();
-  log::trace!("[FFI]: {} Sync Event: {:?}", &request.id, &request.event,);
+  trace!("[FFI]: {} Sync Event: {:?}", &request.id, &request.event,);
 
-  let dispatcher = match APPFLOWY_CORE.read().as_ref() {
+  let dispatcher = match APPFLOWY_CORE.dispatcher() {
     None => {
-      log::error!("sdk not init yet.");
+      error!("sdk not init yet.");
       return forget_rust(Vec::default());
     },
-    Some(e) => e.event_dispatcher.clone(),
+    Some(dispatcher) => dispatcher,
   };
   let _response = AFPluginDispatcher::sync_send(dispatcher, request);
 
@@ -86,6 +110,8 @@ pub extern "C" fn sync_event(input: *const u8, len: usize) -> *const u8 {
 
 #[no_mangle]
 pub extern "C" fn set_stream_port(port: i64) -> i32 {
+  // Make sure hot reload won't register the notification sender twice
+  unregister_all_notification_sender();
   register_notification_sender(DartNotificationSender::new(port));
   0
 }
@@ -105,13 +131,13 @@ async fn post_to_flutter(response: AFPluginEventResponse, port: i64) {
     .await
   {
     Ok(_success) => {
-      log::trace!("[FFI]: Post data to dart success");
+      trace!("[FFI]: Post data to dart success");
     },
     Err(e) => {
       if let Some(msg) = e.downcast_ref::<&str>() {
-        log::error!("[FFI]: {:?}", msg);
+        error!("[FFI]: {:?}", msg);
       } else {
-        log::error!("[FFI]: allo_isolate post panic");
+        error!("[FFI]: allo_isolate post panic");
       }
     },
   }
@@ -131,4 +157,11 @@ pub extern "C" fn backend_log(level: i64, data: *const c_char) {
     4 => tracing::error!("{}", log_str),
     _ => (),
   }
+}
+
+#[no_mangle]
+pub extern "C" fn set_env(data: *const c_char) {
+  let c_str = unsafe { CStr::from_ptr(data) };
+  let serde_str = c_str.to_str().unwrap();
+  AppFlowyEnv::parser(serde_str);
 }

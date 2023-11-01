@@ -18,7 +18,7 @@ You are in charge of your data and customizations.
 </p>
 
 <p align="center">
-    <a href="http://www.appflowy.io"><b>Website</b></a> •
+    <a href="https://www.appflowy.io"><b>Website</b></a> •
     <a href="https://discord.gg/9Q2xaN37tV"><b>Discord</b></a> •
     <a href="https://twitter.com/appflowy"><b>Twitter</b></a>
 </p>
@@ -47,7 +47,7 @@ You are in charge of your data and customizations.
 
 ## Getting Started with development
 
-Please view the [documentation](https://appflowy.gitbook.io/docs/essential-documentation/contribute-to-appflowy) for OS specific development instructions
+Please view the [documentation](https://docs.appflowy.io/docs/documentation/appflowy/from-source) for OS specific development instructions
 
 ## Roadmap
 
@@ -67,6 +67,14 @@ Contributions make the open-source community a fantastic place to learn, inspire
 
 If your Pull Request is accepted as it fixes a bug, adds functionality, or makes AppFlowy's codebase significantly easier to use or understand, **Congratulations!** If your administrative and managerial work behind the scenes sustains the community, **Congratulations!** You are now an official contributor to AppFlowy. Get in touch with us ([link](https://tally.so/r/mKP5z3)) to receive the very special Contributor T-shirt!
 Proudly wear your T-shirt and show it to us by tagging [@appflowy](https://twitter.com/appflowy) on Twitter.
+
+
+## Translations 🌎🗺
+
+[![translation badge](https://inlang.com/badge?url=github.com/AppFlowy-IO/AppFlowy)](https://inlang.com/editor/github.com/AppFlowy-IO/AppFlowy?ref=badge)
+
+To add translations, you can manually edit the JSON translation files in `/frontend/resources/translations`, use the [inlang online editor](https://inlang.com/editor/github.com/AppFlowy-IO/AppFlowy), or run `npx inlang machine translate` to add missing translations.
+
 
 ## Join the community to build AppFlowy together
 

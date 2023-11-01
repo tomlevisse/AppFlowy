@@ -1,10 +1,13 @@
-import { ViewLayoutTypePB, WorkspaceSettingPB } from '../../../services/backend';
-import { FolderEventReadCurrentWorkspace } from '../../../services/backend/events/flowy-folder';
-import { AppBackendService } from '../../stores/effects/folder/app/app_bd_svc';
+import { ViewLayoutPB, WorkspaceSettingPB } from '@/services/backend';
+import { WorkspaceController } from '../../stores/effects/workspace/workspace_controller';
+import { FolderEventGetCurrentWorkspaceSetting } from '@/services/backend/events/flowy-folder2';
 
 export async function createTestDocument() {
-  const workspaceSetting: WorkspaceSettingPB = await FolderEventReadCurrentWorkspace().then((result) => result.unwrap());
-  const app = workspaceSetting.workspace.apps.items[0];
-  const appService = new AppBackendService(app.id);
-  return await appService.createView({ name: 'New Document', layoutType: ViewLayoutTypePB.Document });
+  const workspaceSetting: WorkspaceSettingPB = await FolderEventGetCurrentWorkspaceSetting().then((result) =>
+    result.unwrap()
+  );
+  const appService = new WorkspaceController(workspaceSetting.workspace_id);
+  const result = await appService.createView({ name: 'New Document', layout: ViewLayoutPB.Document });
+
+  return result;
 }

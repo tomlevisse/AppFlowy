@@ -1,5 +1,5 @@
 import 'package:appflowy/plugins/database_view/application/cell/cell_controller_builder.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/field_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pb.dart';
 import 'package:flutter/material.dart';
 
 import '../../application/cell/cell_service.dart';
@@ -10,29 +10,30 @@ import 'cells/date_card_cell.dart';
 import 'cells/number_card_cell.dart';
 import 'cells/select_option_card_cell.dart';
 import 'cells/text_card_cell.dart';
+import 'cells/timestamp_card_cell.dart';
 import 'cells/url_card_cell.dart';
 
 // T represents as the Generic card data
 class CardCellBuilder<CustomCardData> {
-  final CellCache cellCache;
+  final CellMemCache cellCache;
   final Map<FieldType, CardCellStyle>? styles;
 
   CardCellBuilder(this.cellCache, {this.styles});
 
   Widget buildCell({
     CustomCardData? cardData,
-    required CellIdentifier cellId,
+    required DatabaseCellContext cellContext,
     EditableCardNotifier? cellNotifier,
     RowCardRenderHook<CustomCardData>? renderHook,
   }) {
     final cellControllerBuilder = CellControllerBuilder(
-      cellId: cellId,
+      cellContext: cellContext,
       cellCache: cellCache,
     );
 
-    final key = cellId.key();
-    final style = styles?[cellId.fieldType];
-    switch (cellId.fieldType) {
+    final key = cellContext.key();
+    final style = styles?[cellContext.fieldType];
+    switch (cellContext.fieldType) {
       case FieldType.Checkbox:
         return CheckboxCardCell(
           cellControllerBuilder: cellControllerBuilder,
@@ -41,6 +42,18 @@ class CardCellBuilder<CustomCardData> {
       case FieldType.DateTime:
         return DateCardCell<CustomCardData>(
           renderHook: renderHook?.renderHook[FieldType.DateTime],
+          cellControllerBuilder: cellControllerBuilder,
+          key: key,
+        );
+      case FieldType.LastEditedTime:
+        return TimestampCardCell<CustomCardData>(
+          renderHook: renderHook?.renderHook[FieldType.LastEditedTime],
+          cellControllerBuilder: cellControllerBuilder,
+          key: key,
+        );
+      case FieldType.CreatedTime:
+        return TimestampCardCell<CustomCardData>(
+          renderHook: renderHook?.renderHook[FieldType.CreatedTime],
           cellControllerBuilder: cellControllerBuilder,
           key: key,
         );

@@ -5,6 +5,18 @@
     "version": "0.2.0",
     "configurations": [
         {
+            // This task only builds the Dart code of AppFlowy.
+            // It supports both the desktop and mobile version.
+            "name": "AF: Build Dart Only",
+            "request": "launch",
+            "program": "./lib/main.dart",
+            "type": "dart",
+            "env": {
+                "RUST_LOG": "debug",
+            },
+            "cwd": "${workspaceRoot}/appflowy_flutter"
+        },
+        {
             // This task builds the Rust and Dart code of AppFlowy.
             "name": "AF-desktop: Build All",
             "request": "launch",
@@ -13,18 +25,7 @@
             "preLaunchTask": "AF: Build Appflowy Core",
             "env": {
                 "RUST_LOG": "trace",
-                // "RUST_LOG": "debug"
-            },
-            "cwd": "${workspaceRoot}/appflowy_flutter"
-        },
-        {
-            //  This task only builds the Dart code of AppFlowy.
-            "name": "AF-desktop: Build Dart Only",
-            "request": "launch",
-            "program": "./lib/main.dart",
-            "type": "dart",
-            "env": {
-                "RUST_LOG": "debug"
+                "RUST_BACKTRACE": 1
             },
             "cwd": "${workspaceRoot}/appflowy_flutter"
         },
@@ -44,45 +45,43 @@
             "cwd": "${workspaceRoot}/appflowy_flutter"
         },
         {
-            "name": "AF-desktop: Debug Rust",
-            "request": "attach",
-            "type": "lldb",
-            "pid": "${command:pickMyProcess}"
-        },
-        // {
-        //     "name": "AF-desktop: profile mode",
-        //     "request": "launch",
-        //     "program": "./lib/main.dart",
-        //     "type": "dart",
-        //     "flutterMode": "profile",
-        //     "cwd": "${workspaceRoot}/appflowy_flutter"
-        // },
-        {
-            // This task builds the Rust and Dart code of AppFlowy for android.
-            "name": "AF-android: Build All",
+            "name": "AF-iOS: Clean + Rebuild All",
             "request": "launch",
             "program": "./lib/main.dart",
             "type": "dart",
-            "preLaunchTask": "AF: build_mobile_sdk",
+            "preLaunchTask": "AF: Clean + Rebuild All (iOS)",
             "env": {
-                "RUST_LOG": "info"
+                "RUST_LOG": "trace"
             },
             "cwd": "${workspaceRoot}/appflowy_flutter"
         },
         {
-            // This task builds will:
-            // - call the clean task,
-            // - rebuild all the generated Files (including freeze and language files)
-            // - rebuild the the Rust and Dart code of AppFlowy.
-            "name": "AF-android: Clean + Rebuild All",
+            "name": "AF-iOS-Simulator: Clean + Rebuild All",
+            "request": "launch",
+            "program": "./lib/main.dart",
+            "type": "dart",
+            "preLaunchTask": "AF: Clean + Rebuild All (iOS Simulator)",
+            "env": {
+                "RUST_LOG": "trace"
+            },
+            "cwd": "${workspaceRoot}/appflowy_flutter"
+        },
+        {
+            "name": "AF-Android: Clean + Rebuild All",
             "request": "launch",
             "program": "./lib/main.dart",
             "type": "dart",
             "preLaunchTask": "AF: Clean + Rebuild All (Android)",
             "env": {
-                "RUST_LOG": "info"
+                "RUST_LOG": "trace"
             },
             "cwd": "${workspaceRoot}/appflowy_flutter"
+        },
+        {
+            "name": "AF-desktop: Debug Rust",
+            "request": "attach",
+            "type": "lldb",
+            "pid": "${command:pickMyProcess}"
         },
         {
             // https://tauri.app/v1/guides/debugging/vs-code
@@ -99,15 +98,5 @@
             "preLaunchTask": "AF: Tauri UI Dev",
             "cwd": "${workspaceRoot}/appflowy_tauri/"
         },
-        // {
-        //     "type": "lldb",
-        //     "request": "launch",
-        //     "name": "AF-tauri: Production Debug",
-        //     "cargo": {
-        //         "args": ["build", "--release", "--manifest-path=./appflowy_tauri/src-tauri/Cargo.toml"]
-        //     },
-        //     "preLaunchTask": "AF: Tauri UI Build",
-        //     "cwd": "${workspaceRoot}/appflowy_tauri/"
-        // },
     ]
 }

@@ -1,13 +1,14 @@
+import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/plugins/database_view/application/field/type_option/edit_select_option_bloc.dart';
 import 'package:appflowy/plugins/database_view/widgets/row/cells/select_option_cell/extension.dart';
-import 'package:flowy_infra/image.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/select_option.pb.dart';
+
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/style_widget/button.dart';
 import 'package:flowy_infra_ui/style_widget/scrolling/styled_list.dart';
 import 'package:flowy_infra_ui/style_widget/text.dart';
 import 'package:flowy_infra_ui/style_widget/text_field.dart';
 import 'package:flowy_infra_ui/widget/spacing.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/select_type_option.pb.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -54,7 +55,7 @@ class SelectOptionTypeOptionEditor extends StatelessWidget {
         ],
         child: BlocBuilder<EditSelectOptionBloc, EditSelectOptionState>(
           builder: (context, state) {
-            List<Widget> cells = [
+            final List<Widget> cells = [
               _OptionNameTextField(
                 name: state.option.name,
                 autoFocus: autoFocus,
@@ -66,7 +67,12 @@ class SelectOptionTypeOptionEditor extends StatelessWidget {
             if (showOptions) {
               cells.add(const TypeOptionSeparator());
               cells.add(
-                SelectOptionColorList(selectedColor: state.option.color),
+                SelectOptionColorList(
+                  selectedColor: state.option.color,
+                  onSelectedColor: (color) => context
+                      .read<EditSelectOptionBloc>()
+                      .add(EditSelectOptionEvent.updateColor(color)),
+                ),
               );
             }
 
@@ -108,7 +114,7 @@ class _DeleteTag extends StatelessWidget {
         text: FlowyText.medium(
           LocaleKeys.grid_selectOption_deleteTag.tr(),
         ),
-        leftIcon: const FlowySvg(name: 'grid/delete'),
+        leftIcon: const FlowySvg(FlowySvgs.delete_s),
         onTap: () {
           context
               .read<EditSelectOptionBloc>()
@@ -133,7 +139,6 @@ class _OptionNameTextField extends StatelessWidget {
     return FlowyTextField(
       autoFocus: autoFocus,
       text: name,
-      maxLength: 30,
       submitOnLeave: true,
       onSubmitted: (newName) {
         if (name != newName) {
@@ -147,16 +152,22 @@ class _OptionNameTextField extends StatelessWidget {
 }
 
 class SelectOptionColorList extends StatelessWidget {
-  final SelectOptionColorPB selectedColor;
-  const SelectOptionColorList({required this.selectedColor, Key? key})
-      : super(key: key);
+  const SelectOptionColorList({
+    super.key,
+    this.selectedColor,
+    required this.onSelectedColor,
+  });
+
+  final SelectOptionColorPB? selectedColor;
+  final void Function(SelectOptionColorPB color) onSelectedColor;
 
   @override
   Widget build(BuildContext context) {
     final cells = SelectOptionColorPB.values.map((color) {
       return _SelectOptionColorCell(
         color: color,
-        isSelected: selectedColor == color,
+        isSelected: selectedColor != null ? selectedColor == color : false,
+        onSelectedColor: onSelectedColor,
       );
     }).toList();
 
@@ -193,26 +204,29 @@ class SelectOptionColorList extends StatelessWidget {
 }
 
 class _SelectOptionColorCell extends StatelessWidget {
-  final SelectOptionColorPB color;
-  final bool isSelected;
   const _SelectOptionColorCell({
     required this.color,
     required this.isSelected,
+    required this.onSelectedColor,
     Key? key,
   }) : super(key: key);
+
+  final SelectOptionColorPB color;
+  final bool isSelected;
+  final void Function(SelectOptionColorPB color) onSelectedColor;
 
   @override
   Widget build(BuildContext context) {
     Widget? checkmark;
     if (isSelected) {
-      checkmark = svgWidget("grid/checkmark");
+      checkmark = const FlowySvg(FlowySvgs.check_s);
     }
 
     final colorIcon = SizedBox.square(
       dimension: 16,
-      child: Container(
+      child: DecoratedBox(
         decoration: BoxDecoration(
-          color: color.make(context),
+          color: color.toColor(context),
           shape: BoxShape.circle,
         ),
       ),
@@ -228,11 +242,7 @@ class _SelectOptionColorCell extends StatelessWidget {
         ),
         leftIcon: colorIcon,
         rightIcon: checkmark,
-        onTap: () {
-          context
-              .read<EditSelectOptionBloc>()
-              .add(EditSelectOptionEvent.updateColor(color));
-        },
+        onTap: () => onSelectedColor(color),
       ),
     );
   }

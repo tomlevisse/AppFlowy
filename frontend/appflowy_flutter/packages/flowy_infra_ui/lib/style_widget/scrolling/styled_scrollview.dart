@@ -11,6 +11,7 @@ class StyledSingleChildScrollView extends StatefulWidget {
   final ScrollController? controller;
   final EdgeInsets? scrollbarPadding;
   final double barSize;
+  final bool autoHideScrollbar;
 
   final Widget? child;
 
@@ -23,7 +24,8 @@ class StyledSingleChildScrollView extends StatefulWidget {
     this.handleColor,
     this.controller,
     this.scrollbarPadding,
-    this.barSize = 12,
+    this.barSize = 8,
+    this.autoHideScrollbar = true,
   }) : super(key: key);
 
   @override
@@ -58,6 +60,7 @@ class StyledSingleChildScrollViewState
   @override
   Widget build(BuildContext context) {
     return ScrollbarListStack(
+      autoHideScrollbar: widget.autoHideScrollbar,
       contentSize: widget.contentSize,
       axis: widget.axis,
       controller: scrollController,
@@ -90,7 +93,7 @@ class StyledCustomScrollView extends StatefulWidget {
     this.handleColor,
     this.verticalController,
     this.slivers = const <Widget>[],
-    this.barSize = 12,
+    this.barSize = 8,
   }) : super(key: key);
 
   @override

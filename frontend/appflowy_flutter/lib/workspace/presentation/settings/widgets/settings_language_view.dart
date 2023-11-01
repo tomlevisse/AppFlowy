@@ -1,8 +1,8 @@
+import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:appflowy/workspace/application/appearance.dart';
+import 'package:appflowy/workspace/application/settings/appearance/appearance_cubit.dart';
 import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flowy_infra/image.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flowy_infra/language.dart';
@@ -32,6 +32,7 @@ class SettingsLanguageView extends StatelessWidget {
 
 class LanguageSelector extends StatelessWidget {
   final Locale currentLocale;
+
   const LanguageSelector({
     super.key,
     required this.currentLocale,
@@ -49,11 +50,7 @@ class LanguageSelector extends StatelessWidget {
       ),
       popupBuilder: (BuildContext context) {
         final allLocales = EasyLocalization.of(context)!.supportedLocales;
-
-        return LanguageItemsListView(
-          allLocales: allLocales,
-          currentLocale: currentLocale,
-        );
+        return LanguageItemsListView(allLocales: allLocales);
       },
     );
   }
@@ -63,20 +60,23 @@ class LanguageItemsListView extends StatelessWidget {
   const LanguageItemsListView({
     super.key,
     required this.allLocales,
-    required this.currentLocale,
   });
 
   final List<Locale> allLocales;
-  final Locale currentLocale;
 
   @override
   Widget build(BuildContext context) {
+    // get current locale from cubit
+    final state = context.watch<AppearanceSettingsCubit>().state;
     return ConstrainedBox(
       constraints: const BoxConstraints(maxHeight: 400),
       child: ListView.builder(
         itemBuilder: (context, index) {
           final locale = allLocales[index];
-          return LanguageItem(locale: locale, currentLocale: currentLocale);
+          return LanguageItem(
+            locale: locale,
+            currentLocale: state.locale,
+          );
         },
         itemCount: allLocales.length,
       ),
@@ -87,6 +87,7 @@ class LanguageItemsListView extends StatelessWidget {
 class LanguageItem extends StatelessWidget {
   final Locale locale;
   final Locale currentLocale;
+
   const LanguageItem({
     super.key,
     required this.locale,
@@ -101,13 +102,13 @@ class LanguageItem extends StatelessWidget {
         text: FlowyText.medium(
           languageFromLocale(locale),
         ),
-        rightIcon: currentLocale == locale
-            ? const FlowySvg(name: 'grid/checkmark')
-            : null,
+        rightIcon:
+            currentLocale == locale ? const FlowySvg(FlowySvgs.check_s) : null,
         onTap: () {
           if (currentLocale != locale) {
             context.read<AppearanceSettingsCubit>().setLocale(context, locale);
           }
+          PopoverContainer.of(context).close();
         },
       ),
     );

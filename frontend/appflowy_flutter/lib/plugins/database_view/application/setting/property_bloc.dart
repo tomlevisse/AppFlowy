@@ -1,5 +1,8 @@
 import 'package:appflowy/plugins/database_view/application/field/field_controller.dart';
+import 'package:appflowy/plugins/database_view/application/field/field_info.dart';
+import 'package:appflowy/plugins/database_view/application/field_settings/field_settings_service.dart';
 import 'package:appflowy_backend/log.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/field_settings_entities.pb.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'dart:async';
@@ -22,25 +25,47 @@ class DatabasePropertyBloc
         ) {
     on<DatabasePropertyEvent>(
       (event, emit) async {
-        await event.map(
-          initial: (_Initial value) {
+        await event.when(
+          initial: () {
             _startListening();
           },
-          setFieldVisibility: (_SetFieldVisibility value) async {
-            final fieldBackendSvc =
-                FieldBackendService(viewId: viewId, fieldId: value.fieldId);
-            final result =
-                await fieldBackendSvc.updateField(visibility: value.visibility);
-            result.fold(
-              (l) => null,
-              (err) => Log.error(err),
+          setFieldVisibility: (fieldId, visibility) async {
+            final fieldSettingsSvc = FieldSettingsBackendService(
+              viewId: viewId,
             );
+
+            final result = await fieldSettingsSvc.updateFieldSettings(
+              fieldId: fieldId,
+              fieldVisibility: visibility,
+            );
+
+            result.fold((l) => null, (err) => Log.error(err));
           },
-          didReceiveFieldUpdate: (_DidReceiveFieldUpdate value) {
-            emit(state.copyWith(fieldContexts: value.fields));
+          didReceiveFieldUpdate: (fields) {
+            emit(state.copyWith(fieldContexts: fields));
           },
-          moveField: (_MoveField value) {
-            //
+          moveField: (fieldId, fromIndex, toIndex) async {
+            if (fromIndex < toIndex) {
+              toIndex--;
+            }
+            final fieldContexts = List<FieldInfo>.from(state.fieldContexts);
+            fieldContexts.insert(
+              toIndex,
+              fieldContexts.removeAt(fromIndex),
+            );
+            emit(state.copyWith(fieldContexts: fieldContexts));
+
+            final fieldBackendService = FieldBackendService(
+              viewId: viewId,
+              fieldId: fieldId,
+            );
+
+            final result = await fieldBackendService.moveField(
+              fromIndex,
+              toIndex,
+            );
+
+            result.fold((l) => null, (r) => Log.error(r));
           },
         );
       },
@@ -71,13 +96,16 @@ class DatabasePropertyEvent with _$DatabasePropertyEvent {
   const factory DatabasePropertyEvent.initial() = _Initial;
   const factory DatabasePropertyEvent.setFieldVisibility(
     String fieldId,
-    bool visibility,
+    FieldVisibility visibility,
   ) = _SetFieldVisibility;
   const factory DatabasePropertyEvent.didReceiveFieldUpdate(
     List<FieldInfo> fields,
   ) = _DidReceiveFieldUpdate;
-  const factory DatabasePropertyEvent.moveField(int fromIndex, int toIndex) =
-      _MoveField;
+  const factory DatabasePropertyEvent.moveField({
+    required String fieldId,
+    required int fromIndex,
+    required int toIndex,
+  }) = _MoveField;
 }
 
 @freezed

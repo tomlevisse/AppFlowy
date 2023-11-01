@@ -1,6 +1,6 @@
 import { AppflowyLogo } from '../../_shared/svg/AppflowyLogo';
-import { EyeClosed } from '../../_shared/svg/EyeClosedSvg';
-import { EyeOpened } from '../../_shared/svg/EyeOpenSvg';
+import { EyeClosedSvg } from '../../_shared/svg/EyeClosedSvg';
+import { EyeOpenSvg } from '../../_shared/svg/EyeOpenSvg';
 
 import { useSignUp } from './SignUp.hooks';
 import { Link } from 'react-router-dom';
@@ -27,7 +27,7 @@ export const SignUp = () => {
     setRepeatedPassword,
     authError,
   } = useSignUp();
-  const { t } = useTranslation('');
+  const { t } = useTranslation();
   const [showLanguagePopup, setShowLanguagePopup] = useState(false);
 
   return (
@@ -45,7 +45,7 @@ export const SignUp = () => {
           <input
             type='text'
             className={`input w-full ${authError && 'error'}`}
-            placeholder={t('signUp.emailHint') || ''}
+            placeholder={t('signUp.emailHint') ?? ''}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
@@ -61,7 +61,7 @@ export const SignUp = () => {
             <input
               type={showPassword ? 'text' : 'password'}
               className={`input w-full !pr-10 ${authError && 'error'}`}
-              placeholder={t('signUp.passwordHint') || ''}
+              placeholder={t('signUp.passwordHint') ?? ''}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -71,7 +71,7 @@ export const SignUp = () => {
               onClick={onTogglePassword}
               type='button'
             >
-              <span className='h-6 w-6'>{showPassword ? <EyeClosed /> : <EyeOpened />}</span>
+              <span className='h-6 w-6'>{showPassword ? <EyeClosedSvg /> : <EyeOpenSvg />}</span>
             </button>
           </div>
 
@@ -79,7 +79,7 @@ export const SignUp = () => {
             <input
               type={showConfirmPassword ? 'text' : 'password'}
               className={`input w-full !pr-10 ${authError && 'error'}`}
-              placeholder={t('signUp.repeatPasswordHint') || ''}
+              placeholder={t('signUp.repeatPasswordHint') ?? ''}
               value={repeatedPassword}
               onChange={(e) => setRepeatedPassword(e.target.value)}
             />
@@ -89,7 +89,7 @@ export const SignUp = () => {
               onClick={onToggleConfirmPassword}
               type='button'
             >
-              <span className='h-6 w-6'>{showConfirmPassword ? <EyeClosed /> : <EyeOpened />}</span>
+              <span className='h-6 w-6'>{showConfirmPassword ? <EyeClosedSvg /> : <EyeOpenSvg />}</span>
             </button>
           </div>
         </div>
@@ -104,7 +104,7 @@ export const SignUp = () => {
             <span className='text-xs text-gray-500'>
               {t('signUp.alreadyHaveAnAccount')}
               <Link to={'/auth/login'}>
-                <span className='ml-2 text-main-accent hover:text-main-hovered'>{t('signIn.buttonText')}</span>
+                <span className='hover:text-content-hover ml-2 text-fill-hover'>{t('signIn.buttonText')}</span>
               </Link>
             </span>
           </div>
@@ -112,7 +112,10 @@ export const SignUp = () => {
 
         <div className={'absolute right-0 top-0 px-12 py-8'}>
           <div className={'relative h-full w-full'}>
-            <button className={'h-8 w-8 text-shade-3 hover:text-black'} onClick={() => setShowLanguagePopup(true)}>
+            <button
+              className={'h-8 w-8 text-text-caption hover:text-text-title'}
+              onClick={() => setShowLanguagePopup(true)}
+            >
               <EarthSvg></EarthSvg>
             </button>
             {showLanguagePopup && (

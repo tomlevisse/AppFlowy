@@ -1,25 +1,25 @@
+import 'dart:async';
+
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/plugins/database_view/application/cell/cell_controller_builder.dart';
-import 'package:appflowy/plugins/database_view/application/cell/cell_service.dart';
+import 'package:appflowy/plugins/database_view/application/cell/date_cell_service.dart';
 import 'package:appflowy/plugins/database_view/application/field/field_service.dart';
-import 'package:easy_localization/easy_localization.dart'
-    show StringTranslateExtension;
 import 'package:appflowy_backend/log.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/date_entities.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/code.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/date_type_option.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/date_type_option_entities.pb.dart';
+import 'package:easy_localization/easy_localization.dart'
+    show StringTranslateExtension;
+import 'package:flowy_infra/time/duration.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:table_calendar/table_calendar.dart';
-import 'dart:async';
-import 'package:dartz/dartz.dart';
 import 'package:protobuf/protobuf.dart';
 
 part 'date_cal_bloc.freezed.dart';
 
 class DateCellCalendarBloc
     extends Bloc<DateCellCalendarEvent, DateCellCalendarState> {
+  final DateCellBackendService _dateCellBackendService;
   final DateCellController cellController;
   void Function()? _onCellChangedFn;
 
@@ -27,30 +27,79 @@ class DateCellCalendarBloc
     required DateTypeOptionPB dateTypeOptionPB,
     required DateCellDataPB? cellData,
     required this.cellController,
-  }) : super(DateCellCalendarState.initial(dateTypeOptionPB, cellData)) {
+  })  : _dateCellBackendService = DateCellBackendService(
+          viewId: cellController.viewId,
+          fieldId: cellController.fieldId,
+          rowId: cellController.rowId,
+        ),
+        super(DateCellCalendarState.initial(dateTypeOptionPB, cellData)) {
     on<DateCellCalendarEvent>(
       (event, emit) async {
         await event.when(
           initial: () async => _startListening(),
-          selectDay: (date) async {
-            await _updateDateData(emit, date: date, time: state.time);
-          },
-          setCalFormat: (format) {
-            emit(state.copyWith(format: format));
-          },
-          setFocusedDay: (focusedDay) {
-            emit(state.copyWith(focusedDay: focusedDay));
-          },
           didReceiveCellUpdate: (DateCellDataPB? cellData) {
-            final dateCellData = calDataFromCellData(cellData);
-            final time = dateCellData.foldRight(
-              "",
-              (dateData, previous) => dateData.time ?? '',
+            final (dateTime, endDateTime, time, endTime, includeTime, isRange) =
+                _dateDataFromCellData(cellData);
+            final endDay =
+                isRange == state.isRange && isRange ? endDateTime : null;
+            emit(
+              state.copyWith(
+                dateTime: dateTime,
+                time: time,
+                endDateTime: endDateTime,
+                endTime: endTime,
+                includeTime: includeTime,
+                isRange: isRange,
+                startDay: isRange ? dateTime : null,
+                endDay: endDay,
+              ),
             );
-            emit(state.copyWith(dateCellData: dateCellData, time: time));
+          },
+          didReceiveTimeFormatError:
+              (String? parseTimeError, String? parseEndTimeError) {
+            emit(
+              state.copyWith(
+                parseTimeError: parseTimeError,
+                parseEndTimeError: parseEndTimeError,
+              ),
+            );
+          },
+          selectDay: (date) async {
+            if (state.isRange) {
+              return;
+            }
+            await _updateDateData(date: date);
           },
           setIncludeTime: (includeTime) async {
-            await _updateDateData(emit, includeTime: includeTime);
+            await _updateDateData(includeTime: includeTime);
+          },
+          setIsRange: (isRange) async {
+            await _updateDateData(isRange: isRange);
+          },
+          setTime: (time) async {
+            await _updateDateData(time: time);
+          },
+          selectDateRange: (DateTime? start, DateTime? end) async {
+            if (end == null && state.startDay != null && state.endDay == null) {
+              final (newStart, newEnd) = state.startDay!.isBefore(start!)
+                  ? (state.startDay!, start)
+                  : (start, state.startDay!);
+              emit(state.copyWith(startDay: null, endDay: null));
+              await _updateDateData(
+                date: newStart.date,
+                endDate: newEnd.date,
+              );
+            } else if (end == null) {
+              emit(state.copyWith(startDay: start, endDay: null));
+            } else {
+              await _updateDateData(
+                date: start!.date,
+                endDate: end.date,
+              );
+            }
+          },
+          setEndTime: (String endTime) async {
+            await _updateDateData(endTime: endTime);
           },
           setDateFormat: (dateFormat) async {
             await _updateTypeOption(emit, dateFormat: dateFormat);
@@ -58,112 +107,111 @@ class DateCellCalendarBloc
           setTimeFormat: (timeFormat) async {
             await _updateTypeOption(emit, timeFormat: timeFormat);
           },
-          setTime: (time) async {
-            if (state.dateCellData.isSome()) {
-              await _updateDateData(emit, time: time);
-            }
-          },
-          didUpdateCalData:
-              (Option<DateCellData> data, Option<String> timeFormatError) {
-            emit(
-              state.copyWith(
-                dateCellData: data,
-                timeFormatError: timeFormatError,
-              ),
-            );
+          clearDate: () async {
+            await _clearDate();
           },
         );
       },
     );
   }
 
-  Future<void> _updateDateData(
-    Emitter<DateCellCalendarState> emit, {
+  Future<void> _updateDateData({
     DateTime? date,
     String? time,
+    DateTime? endDate,
+    String? endTime,
     bool? includeTime,
-  }) {
-    final DateCellData newDateData = state.dateCellData.fold(
-      () {
-        DateTime newDate = DateTime.now();
-        if (date != null) {
-          newDate = _utcToLocalAddTime(date);
-        }
-        return DateCellData(
-          date: newDate,
-          time: time,
-          includeTime: includeTime ?? false,
-        );
-      },
-      (dateData) {
-        var newDateData = dateData;
-        if (date != null && !isSameDay(newDateData.date, date)) {
-          newDateData = newDateData.copyWith(
-            date: _utcToLocalAddTime(date),
+    bool? isRange,
+  }) async {
+    // make sure that not both date and time are updated at the same time
+    assert(
+      !(date != null && time != null) || !(endDate != null && endTime != null),
+    );
+
+    // if not updating the time, use the old time in the state
+    final String? newTime = time ?? state.time;
+    DateTime? newDate;
+    if (time != null && time.isNotEmpty) {
+      newDate = state.dateTime ?? DateTime.now();
+    } else {
+      newDate = _utcToLocalAndAddCurrentTime(date);
+    }
+
+    // if not updating the time, use the old time in the state
+    final String? newEndTime = endTime ?? state.endTime;
+    DateTime? newEndDate;
+    if (endTime != null && endTime.isNotEmpty) {
+      newEndDate = state.endDateTime ?? DateTime.now();
+    } else {
+      newEndDate = _utcToLocalAndAddCurrentTime(endDate);
+    }
+
+    final result = await _dateCellBackendService.update(
+      date: newDate,
+      time: newTime,
+      endDate: newEndDate,
+      endTime: newEndTime,
+      includeTime: includeTime ?? state.includeTime,
+      isRange: isRange ?? state.isRange,
+    );
+
+    result.fold(
+      (_) {
+        if (!isClosed &&
+            (state.parseEndTimeError != null || state.parseTimeError != null)) {
+          add(
+            const DateCellCalendarEvent.didReceiveTimeFormatError(null, null),
           );
         }
-
-        if (newDateData.time != time) {
-          newDateData = newDateData.copyWith(time: time);
-        }
-
-        if (includeTime != null && newDateData.includeTime != includeTime) {
-          newDateData = newDateData.copyWith(includeTime: includeTime);
-        }
-
-        return newDateData;
       },
-    );
-
-    return _saveDateData(emit, newDateData);
-  }
-
-  Future<void> _saveDateData(
-    Emitter<DateCellCalendarState> emit,
-    DateCellData newCalData,
-  ) async {
-    if (state.dateCellData == Some(newCalData)) {
-      return;
-    }
-
-    updateCalData(
-      Option<DateCellData> dateCellData,
-      Option<String> timeFormatError,
-    ) {
-      if (!isClosed) {
-        add(
-          DateCellCalendarEvent.didUpdateCalData(
-            dateCellData,
-            timeFormatError,
-          ),
-        );
-      }
-    }
-
-    cellController.saveCellData(
-      newCalData,
-      onFinish: (result) {
-        result.fold(
-          () => updateCalData(Some(newCalData), none()),
-          (err) {
-            switch (ErrorCode.valueOf(err.code)!) {
-              case ErrorCode.InvalidDateTimeFormat:
-                updateCalData(state.dateCellData, Some(timeFormatPrompt(err)));
-                break;
-              default:
-                Log.error(err);
+      (err) {
+        switch (err.code) {
+          case ErrorCode.InvalidDateTimeFormat:
+            if (isClosed) {
+              return;
             }
-          },
-        );
+            // to determine which textfield should show error
+            final (startError, endError) = newDate != null
+                ? (timeFormatPrompt(err), null)
+                : (null, timeFormatPrompt(err));
+            add(
+              DateCellCalendarEvent.didReceiveTimeFormatError(
+                startError,
+                endError,
+              ),
+            );
+            break;
+          default:
+            Log.error(err);
+        }
       },
     );
   }
 
-  DateTime _utcToLocalAddTime(DateTime date) {
+  Future<void> _clearDate() async {
+    final result = await _dateCellBackendService.clear();
+    result.fold(
+      (_) {
+        if (isClosed) {
+          return;
+        }
+
+        add(
+          const DateCellCalendarEvent.didReceiveTimeFormatError(null, null),
+        );
+      },
+      (err) => Log.error(err),
+    );
+  }
+
+  DateTime? _utcToLocalAndAddCurrentTime(DateTime? date) {
+    if (date == null) {
+      return null;
+    }
     final now = DateTime.now();
-    // the incoming date is Utc. this trick converts it into Local
-    // and add the current time, though
-    // the time may be overwritten by explicitly provided time string
+    // the incoming date is Utc. This trick converts it into Local
+    // and add the current time. The time may be overwritten by
+    // explicitly provided time string in the backend though
     return DateTime(
       date.year,
       date.month,
@@ -175,18 +223,13 @@ class DateCellCalendarBloc
   }
 
   String timeFormatPrompt(FlowyError error) {
-    String msg = "${LocaleKeys.grid_field_invalidTimeFormat.tr()}.";
-    switch (state.dateTypeOptionPB.timeFormat) {
-      case TimeFormat.TwelveHour:
-        msg = "$msg e.g. 01:00 PM";
-        break;
-      case TimeFormat.TwentyFourHour:
-        msg = "$msg e.g. 13:00";
-        break;
-      default:
-        break;
-    }
-    return msg;
+    return switch (state.dateTypeOptionPB.timeFormat) {
+      TimeFormatPB.TwelveHour =>
+        "${LocaleKeys.grid_field_invalidTimeFormat.tr()}. e.g. 01:00 PM",
+      TimeFormatPB.TwentyFourHour =>
+        "${LocaleKeys.grid_field_invalidTimeFormat.tr()}. e.g. 13:00",
+      _ => "",
+    };
   }
 
   @override
@@ -211,8 +254,8 @@ class DateCellCalendarBloc
 
   Future<void>? _updateTypeOption(
     Emitter<DateCellCalendarState> emit, {
-    DateFormat? dateFormat,
-    TimeFormat? timeFormat,
+    DateFormatPB? dateFormat,
+    TimeFormatPB? timeFormat,
   }) async {
     state.dateTypeOptionPB.freeze();
     final newDateTypeOption = state.dateTypeOptionPB.rebuild((typeOption) {
@@ -245,36 +288,60 @@ class DateCellCalendarBloc
 
 @freezed
 class DateCellCalendarEvent with _$DateCellCalendarEvent {
+  // initial event
   const factory DateCellCalendarEvent.initial() = _Initial;
-  const factory DateCellCalendarEvent.selectDay(DateTime day) = _SelectDay;
-  const factory DateCellCalendarEvent.setCalFormat(CalendarFormat format) =
-      _CalendarFormat;
-  const factory DateCellCalendarEvent.setFocusedDay(DateTime day) = _FocusedDay;
-  const factory DateCellCalendarEvent.setTimeFormat(TimeFormat timeFormat) =
-      _TimeFormat;
-  const factory DateCellCalendarEvent.setDateFormat(DateFormat dateFormat) =
-      _DateFormat;
-  const factory DateCellCalendarEvent.setIncludeTime(bool includeTime) =
-      _IncludeTime;
-  const factory DateCellCalendarEvent.setTime(String time) = _Time;
+
+  // notification that cell is updated in the backend
   const factory DateCellCalendarEvent.didReceiveCellUpdate(
     DateCellDataPB? data,
   ) = _DidReceiveCellUpdate;
-  const factory DateCellCalendarEvent.didUpdateCalData(
-    Option<DateCellData> data,
-    Option<String> timeFormatError,
-  ) = _DidUpdateCalData;
+  const factory DateCellCalendarEvent.didReceiveTimeFormatError(
+    String? parseTimeError,
+    String? parseEndTimeError,
+  ) = _DidReceiveTimeFormatError;
+
+  // date cell data is modified
+  const factory DateCellCalendarEvent.selectDay(DateTime day) = _SelectDay;
+  const factory DateCellCalendarEvent.selectDateRange(
+    DateTime? start,
+    DateTime? end,
+  ) = _SelectDateRange;
+  const factory DateCellCalendarEvent.setTime(String time) = _Time;
+  const factory DateCellCalendarEvent.setEndTime(String endTime) = _EndTime;
+  const factory DateCellCalendarEvent.setIncludeTime(bool includeTime) =
+      _IncludeTime;
+  const factory DateCellCalendarEvent.setIsRange(bool isRange) = _IsRange;
+
+  // date field type options are modified
+  const factory DateCellCalendarEvent.setTimeFormat(TimeFormatPB timeFormat) =
+      _TimeFormat;
+  const factory DateCellCalendarEvent.setDateFormat(DateFormatPB dateFormat) =
+      _DateFormat;
+
+  const factory DateCellCalendarEvent.clearDate() = _ClearDate;
 }
 
 @freezed
 class DateCellCalendarState with _$DateCellCalendarState {
   const factory DateCellCalendarState({
+    // the date field's type option
     required DateTypeOptionPB dateTypeOptionPB,
-    required CalendarFormat format,
-    required DateTime focusedDay,
-    required Option<String> timeFormatError,
-    required Option<DateCellData> dateCellData,
+
+    // used when selecting a date range
+    required DateTime? startDay,
+    required DateTime? endDay,
+
+    // cell data from the backend
+    required DateTime? dateTime,
+    required DateTime? endDateTime,
     required String? time,
+    required String? endTime,
+    required bool includeTime,
+    required bool isRange,
+
+    // error and hint text
+    required String? parseTimeError,
+    required String? parseEndTimeError,
     required String timeHintText,
   }) = _DateCellCalendarState;
 
@@ -282,16 +349,20 @@ class DateCellCalendarState with _$DateCellCalendarState {
     DateTypeOptionPB dateTypeOptionPB,
     DateCellDataPB? cellData,
   ) {
-    Option<DateCellData> dateCellData = calDataFromCellData(cellData);
-    final time =
-        dateCellData.foldRight("", (dateData, previous) => dateData.time ?? '');
+    final (dateTime, endDateTime, time, endTime, includeTime, isRange) =
+        _dateDataFromCellData(cellData);
     return DateCellCalendarState(
       dateTypeOptionPB: dateTypeOptionPB,
-      format: CalendarFormat.month,
-      focusedDay: DateTime.now(),
+      startDay: isRange ? dateTime : null,
+      endDay: isRange ? endDateTime : null,
+      dateTime: dateTime,
+      endDateTime: endDateTime,
       time: time,
-      dateCellData: dateCellData,
-      timeFormatError: none(),
+      endTime: endTime,
+      includeTime: includeTime,
+      isRange: isRange,
+      parseTimeError: null,
+      parseEndTimeError: null,
       timeHintText: _timeHintText(dateTypeOptionPB),
     );
   }
@@ -299,36 +370,40 @@ class DateCellCalendarState with _$DateCellCalendarState {
 
 String _timeHintText(DateTypeOptionPB typeOption) {
   switch (typeOption.timeFormat) {
-    case TimeFormat.TwelveHour:
+    case TimeFormatPB.TwelveHour:
       return LocaleKeys.document_date_timeHintTextInTwelveHour.tr();
-    case TimeFormat.TwentyFourHour:
+    case TimeFormatPB.TwentyFourHour:
       return LocaleKeys.document_date_timeHintTextInTwentyFourHour.tr();
     default:
       return "";
   }
 }
 
-Option<DateCellData> calDataFromCellData(DateCellDataPB? cellData) {
-  String? time = timeFromCellData(cellData);
-  Option<DateCellData> dateData = none();
-  if (cellData != null) {
+(DateTime?, DateTime?, String?, String?, bool, bool) _dateDataFromCellData(
+  DateCellDataPB? cellData,
+) {
+  // a null DateCellDataPB may be returned, indicating that all the fields are
+  // their default values: empty strings and false booleans
+  if (cellData == null) {
+    return (null, null, null, null, false, false);
+  }
+
+  DateTime? dateTime;
+  String? time;
+  DateTime? endDateTime;
+  String? endTime;
+  if (cellData.hasTimestamp()) {
     final timestamp = cellData.timestamp * 1000;
-    final date = DateTime.fromMillisecondsSinceEpoch(timestamp.toInt());
-    dateData = Some(
-      DateCellData(
-        date: date,
-        time: time,
-        includeTime: cellData.includeTime,
-      ),
-    );
+    dateTime = DateTime.fromMillisecondsSinceEpoch(timestamp.toInt());
+    time = cellData.time;
+    if (cellData.hasEndTimestamp()) {
+      final endTimestamp = cellData.endTimestamp * 1000;
+      endDateTime = DateTime.fromMillisecondsSinceEpoch(endTimestamp.toInt());
+      endTime = cellData.endTime;
+    }
   }
-  return dateData;
-}
+  final bool includeTime = cellData.includeTime;
+  final bool isRange = cellData.isRange;
 
-String? timeFromCellData(DateCellDataPB? cellData) {
-  if (cellData == null || !cellData.hasTime()) {
-    return null;
-  }
-
-  return cellData.time;
+  return (dateTime, endDateTime, time, endTime, includeTime, isRange);
 }

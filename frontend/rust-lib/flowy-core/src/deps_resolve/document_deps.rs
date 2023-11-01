@@ -1,117 +1,64 @@
-use bytes::Bytes;
-use flowy_client_ws::FlowyWebSocketConnect;
-use flowy_document::{
-  errors::{internal_error, FlowyError},
-  DocumentCloudService, DocumentConfig, DocumentDatabase, DocumentManager, DocumentUser,
-};
-use flowy_net::ClientServerConfiguration;
-use flowy_net::{http_server::document::DocumentCloudServiceImpl, local_server::LocalServer};
-use flowy_revision::{RevisionWebSocket, WSStateReceiver};
-use flowy_sqlite::ConnectionPool;
-use flowy_user::services::UserSession;
-use futures_core::future::BoxFuture;
-use lib_infra::future::BoxResultFuture;
-use lib_ws::{WSChannel, WSMessageReceiver, WebSocketRawMessage};
-use std::{convert::TryInto, path::Path, sync::Arc};
-use ws_model::ws_revision::ClientRevisionWSData;
+use std::sync::{Arc, Weak};
+
+use collab_integrate::collab_builder::AppFlowyCollabBuilder;
+use collab_integrate::RocksCollabDB;
+use flowy_database2::DatabaseManager;
+use flowy_document2::manager::{DocumentManager, DocumentUser};
+use flowy_document_deps::cloud::DocumentCloudService;
+use flowy_error::FlowyError;
+use flowy_storage::FileStorageService;
+use flowy_user::manager::UserManager;
 
 pub struct DocumentDepsResolver();
 impl DocumentDepsResolver {
   pub fn resolve(
-    local_server: Option<Arc<LocalServer>>,
-    ws_conn: Arc<FlowyWebSocketConnect>,
-    user_session: Arc<UserSession>,
-    server_config: &ClientServerConfiguration,
-    document_config: &DocumentConfig,
+    user_manager: Weak<UserManager>,
+    _database_manager: &Arc<DatabaseManager>,
+    collab_builder: Arc<AppFlowyCollabBuilder>,
+    cloud_service: Arc<dyn DocumentCloudService>,
+    storage_service: Weak<dyn FileStorageService>,
   ) -> Arc<DocumentManager> {
-    let user = Arc::new(BlockUserImpl(user_session.clone()));
-    let rev_web_socket = Arc::new(DocumentRevisionWebSocket(ws_conn.clone()));
-    let cloud_service: Arc<dyn DocumentCloudService> = match local_server {
-      None => Arc::new(DocumentCloudServiceImpl::new(server_config.clone())),
-      Some(local_server) => local_server,
-    };
-    let database = Arc::new(DocumentDatabaseImpl(user_session));
-
-    let manager = Arc::new(DocumentManager::new(
+    let user: Arc<dyn DocumentUser> = Arc::new(DocumentUserImpl(user_manager));
+    Arc::new(DocumentManager::new(
+      user.clone(),
+      collab_builder,
       cloud_service,
-      user,
-      database,
-      rev_web_socket,
-      document_config.clone(),
-    ));
-    let receiver = Arc::new(DocumentWSMessageReceiverImpl(manager.clone()));
-    ws_conn.add_ws_message_receiver(receiver).unwrap();
-
-    manager
+      storage_service,
+    ))
   }
 }
 
-struct BlockUserImpl(Arc<UserSession>);
-impl DocumentUser for BlockUserImpl {
-  fn user_dir(&self) -> Result<String, FlowyError> {
-    let dir = self
+struct DocumentUserImpl(Weak<UserManager>);
+impl DocumentUser for DocumentUserImpl {
+  fn user_id(&self) -> Result<i64, FlowyError> {
+    self
       .0
-      .user_dir()
-      .map_err(|e| FlowyError::unauthorized().context(e))?;
-
-    let doc_dir = format!("{}/document", dir);
-    if !Path::new(&doc_dir).exists() {
-      std::fs::create_dir_all(&doc_dir)?;
-    }
-    Ok(doc_dir)
+      .upgrade()
+      .ok_or(FlowyError::internal().with_context("Unexpected error: UserSession is None"))?
+      .user_id()
   }
 
-  fn user_id(&self) -> Result<String, FlowyError> {
-    self.0.user_id()
+  fn workspace_id(&self) -> Result<String, FlowyError> {
+    self
+      .0
+      .upgrade()
+      .ok_or(FlowyError::internal().with_context("Unexpected error: UserSession is None"))?
+      .workspace_id()
   }
 
-  fn token(&self) -> Result<String, FlowyError> {
-    self.0.token()
-  }
-}
-
-struct DocumentDatabaseImpl(Arc<UserSession>);
-impl DocumentDatabase for DocumentDatabaseImpl {
-  fn db_pool(&self) -> Result<Arc<ConnectionPool>, FlowyError> {
-    self.0.db_pool()
-  }
-}
-
-struct DocumentRevisionWebSocket(Arc<FlowyWebSocketConnect>);
-impl RevisionWebSocket for DocumentRevisionWebSocket {
-  fn send(&self, data: ClientRevisionWSData) -> BoxResultFuture<(), FlowyError> {
-    let bytes: Bytes = data.try_into().unwrap();
-    let msg = WebSocketRawMessage {
-      channel: WSChannel::Document,
-      data: bytes.to_vec(),
-    };
-    let ws_conn = self.0.clone();
-    Box::pin(async move {
-      match ws_conn.web_socket().await? {
-        None => {},
-        Some(sender) => {
-          sender.send(msg).map_err(internal_error)?;
-        },
-      }
-      Ok(())
-    })
+  fn token(&self) -> Result<Option<String>, FlowyError> {
+    self
+      .0
+      .upgrade()
+      .ok_or(FlowyError::internal().with_context("Unexpected error: UserSession is None"))?
+      .token()
   }
 
-  fn subscribe_state_changed(&self) -> BoxFuture<WSStateReceiver> {
-    let ws_conn = self.0.clone();
-    Box::pin(async move { ws_conn.subscribe_websocket_state().await })
-  }
-}
-
-struct DocumentWSMessageReceiverImpl(Arc<DocumentManager>);
-impl WSMessageReceiver for DocumentWSMessageReceiverImpl {
-  fn source(&self) -> WSChannel {
-    WSChannel::Document
-  }
-  fn receive_message(&self, msg: WebSocketRawMessage) {
-    let handler = self.0.clone();
-    tokio::spawn(async move {
-      handler.receive_ws_data(Bytes::from(msg.data)).await;
-    });
+  fn collab_db(&self, uid: i64) -> Result<Weak<RocksCollabDB>, FlowyError> {
+    self
+      .0
+      .upgrade()
+      .ok_or(FlowyError::internal().with_context("Unexpected error: UserSession is None"))?
+      .get_collab_db(uid)
   }
 }

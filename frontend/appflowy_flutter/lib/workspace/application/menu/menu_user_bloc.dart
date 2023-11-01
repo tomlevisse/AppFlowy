@@ -1,7 +1,7 @@
 import 'package:appflowy/user/application/user_listener.dart';
 import 'package:appflowy/user/application/user_service.dart';
 import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_backend/protobuf/flowy-folder/workspace.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-folder2/workspace.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/user_profile.pb.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -26,9 +26,6 @@ class MenuUserBloc extends Bloc<MenuUserEvent, MenuUserState> {
       await event.when(
         initial: () async {
           _userListener.start(onProfileUpdated: _profileUpdated);
-          _userWorkspaceListener.start(
-            onWorkspacesUpdated: _workspaceListUpdated,
-          );
           await _initUser();
         },
         fetchWorkspaces: () async {
@@ -62,17 +59,15 @@ class MenuUserBloc extends Bloc<MenuUserEvent, MenuUserState> {
   }
 
   void _profileUpdated(Either<UserProfilePB, FlowyError> userProfileOrFailed) {
+    if (isClosed) {
+      return;
+    }
     userProfileOrFailed.fold(
-      (newUserProfile) =>
-          add(MenuUserEvent.didReceiveUserProfile(newUserProfile)),
+      (newUserProfile) => add(
+        MenuUserEvent.didReceiveUserProfile(newUserProfile),
+      ),
       (err) => Log.error(err),
     );
-  }
-
-  void _workspaceListUpdated(
-    Either<List<WorkspacePB>, FlowyError> workspacesOrFailed,
-  ) {
-    // Do nothing by now
   }
 }
 

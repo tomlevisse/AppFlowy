@@ -1,7 +1,8 @@
 import 'package:appflowy/user/application/user_settings_service.dart';
-import 'package:appflowy/workspace/application/appearance.dart';
+import 'package:appflowy/workspace/application/settings/appearance/appearance_cubit.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/user_setting.pb.dart';
+import 'package:flowy_infra/theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,17 +17,24 @@ void main() {
 
   group('$AppearanceSettingsCubit', () {
     late AppearanceSettingsPB appearanceSetting;
+    late DateTimeSettingsPB dateTimeSettings;
+
     setUp(() async {
       appearanceSetting =
           await UserSettingsBackendService().getAppearanceSetting();
+      dateTimeSettings =
+          await UserSettingsBackendService().getDateTimeSettings();
       await blocResponseFuture();
     });
 
     blocTest<AppearanceSettingsCubit, AppearanceSettingsState>(
       'default theme',
-      build: () => AppearanceSettingsCubit(appearanceSetting),
+      build: () => AppearanceSettingsCubit(
+        appearanceSetting,
+        dateTimeSettings,
+        AppTheme.fallback,
+      ),
       verify: (bloc) {
-        // expect(bloc.state.appTheme.info.name, "light");
         expect(bloc.state.font, 'Poppins');
         expect(bloc.state.monospaceFont, 'SF Mono');
         expect(bloc.state.themeMode, ThemeMode.system);
@@ -35,7 +43,11 @@ void main() {
 
     blocTest<AppearanceSettingsCubit, AppearanceSettingsState>(
       'save key/value',
-      build: () => AppearanceSettingsCubit(appearanceSetting),
+      build: () => AppearanceSettingsCubit(
+        appearanceSetting,
+        dateTimeSettings,
+        AppTheme.fallback,
+      ),
       act: (bloc) {
         bloc.setKeyValue("123", "456");
       },
@@ -46,12 +58,28 @@ void main() {
 
     blocTest<AppearanceSettingsCubit, AppearanceSettingsState>(
       'remove key/value',
-      build: () => AppearanceSettingsCubit(appearanceSetting),
+      build: () => AppearanceSettingsCubit(
+        appearanceSetting,
+        dateTimeSettings,
+        AppTheme.fallback,
+      ),
       act: (bloc) {
         bloc.setKeyValue("123", null);
       },
       verify: (bloc) {
         expect(bloc.getValue("123"), null);
+      },
+    );
+
+    blocTest<AppearanceSettingsCubit, AppearanceSettingsState>(
+      'initial state uses fallback theme',
+      build: () => AppearanceSettingsCubit(
+        appearanceSetting,
+        dateTimeSettings,
+        AppTheme.fallback,
+      ),
+      verify: (bloc) {
+        expect(bloc.state.appTheme.themeName, AppTheme.fallback.themeName);
       },
     );
   });

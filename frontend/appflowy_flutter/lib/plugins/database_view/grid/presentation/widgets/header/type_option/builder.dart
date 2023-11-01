@@ -1,19 +1,18 @@
 import 'dart:typed_data';
 
-import 'package:appflowy/plugins/database_view/application/field/field_controller.dart';
+import 'package:appflowy/plugins/database_view/application/field/field_info.dart';
 import 'package:appflowy/plugins/database_view/application/field/type_option/type_option_context.dart';
 import 'package:appflowy/plugins/database_view/application/field/type_option/type_option_data_controller.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/checkbox_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/date_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/number_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/select_option.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/text_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/timestamp_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/url_entities.pb.dart';
 import 'package:appflowy_popover/appflowy_popover.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/checkbox_type_option.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/checklist_type_option.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/date_type_option.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/multi_select_type_option.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/number_type_option.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/single_select_type_option.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/text_type_option.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/url_type_option.pb.dart';
 import 'package:protobuf/protobuf.dart' hide FieldInfo;
-import 'package:appflowy_backend/protobuf/flowy-database/field_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pb.dart';
 import 'package:flutter/material.dart';
 import 'checkbox.dart';
 import 'checklist.dart';
@@ -22,6 +21,7 @@ import 'multi_select.dart';
 import 'number.dart';
 import 'rich_text.dart';
 import 'single_select.dart';
+import 'timestamp.dart';
 import 'url.dart';
 
 typedef TypeOptionData = Uint8List;
@@ -62,7 +62,7 @@ TypeOptionWidgetBuilder makeTypeOptionWidgetBuilder({
   required TypeOptionController dataController,
   required PopoverMutex popoverMutex,
 }) {
-  final viewId = dataController.viewId;
+  final viewId = dataController.loader.viewId;
   final fieldType = dataController.field.fieldType;
 
   switch (dataController.field.fieldType) {
@@ -77,6 +77,16 @@ TypeOptionWidgetBuilder makeTypeOptionWidgetBuilder({
     case FieldType.DateTime:
       return DateTypeOptionWidgetBuilder(
         makeTypeOptionContextWithDataController<DateTypeOptionPB>(
+          viewId: viewId,
+          fieldType: fieldType,
+          dataController: dataController,
+        ),
+        popoverMutex,
+      );
+    case FieldType.LastEditedTime:
+    case FieldType.CreatedTime:
+      return TimestampTypeOptionWidgetBuilder(
+        makeTypeOptionContextWithDataController<TimestampTypeOptionPB>(
           viewId: viewId,
           fieldType: fieldType,
           dataController: dataController,
@@ -146,9 +156,8 @@ TypeOptionContext<T> makeTypeOptionContext<T extends GeneratedMessage>({
 }) {
   final loader = FieldTypeOptionLoader(viewId: viewId, field: fieldInfo.field);
   final dataController = TypeOptionController(
-    viewId: viewId,
     loader: loader,
-    fieldInfo: fieldInfo,
+    field: fieldInfo.field,
   );
   return makeTypeOptionContextWithDataController(
     viewId: viewId,
@@ -180,8 +189,8 @@ TypeOptionContext<T> makeSelectTypeOptionContext<T extends GeneratedMessage>({
     field: fieldPB,
   );
   final dataController = TypeOptionController(
-    viewId: viewId,
     loader: loader,
+    field: fieldPB,
   );
   final typeOptionContext = makeTypeOptionContextWithDataController<T>(
     viewId: viewId,
@@ -207,6 +216,12 @@ TypeOptionContext<T>
       return DateTypeOptionContext(
         dataController: dataController,
         dataParser: DateTypeOptionDataParser(),
+      ) as TypeOptionContext<T>;
+    case FieldType.LastEditedTime:
+    case FieldType.CreatedTime:
+      return TimestampTypeOptionContext(
+        dataController: dataController,
+        dataParser: TimestampTypeOptionDataParser(),
       ) as TypeOptionContext<T>;
     case FieldType.SingleSelect:
       return SingleSelectTypeOptionContext(

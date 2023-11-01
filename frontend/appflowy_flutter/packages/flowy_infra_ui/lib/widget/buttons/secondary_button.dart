@@ -4,19 +4,50 @@ import 'package:flowy_infra/size.dart';
 
 import 'base_styled_button.dart';
 
+enum TextButtonMode {
+  normal,
+  big,
+  small;
+
+  Size get size {
+    switch (this) {
+      case TextButtonMode.normal:
+        return const Size(80, 32);
+      case TextButtonMode.big:
+        return const Size(100, 40);
+      case TextButtonMode.small:
+        return const Size(100, 30);
+    }
+  }
+
+  BorderRadius get borderRadius {
+    switch (this) {
+      case TextButtonMode.normal:
+        return Corners.s8Border;
+      case TextButtonMode.big:
+        return Corners.s12Border;
+      case TextButtonMode.small:
+        return Corners.s6Border;
+    }
+  }
+}
+
 class SecondaryTextButton extends StatelessWidget {
+  const SecondaryTextButton(
+    this.label, {
+    super.key,
+    this.onPressed,
+    this.mode = TextButtonMode.normal,
+  });
+
   final String label;
   final VoidCallback? onPressed;
-  final bool bigMode;
-
-  const SecondaryTextButton(this.label,
-      {Key? key, this.onPressed, this.bigMode = false})
-      : super(key: key);
+  final TextButtonMode mode;
 
   @override
   Widget build(BuildContext context) {
     return SecondaryButton(
-      bigMode: bigMode,
+      mode: mode,
       onPressed: onPressed,
       child: FlowyText.regular(
         label,
@@ -27,23 +58,27 @@ class SecondaryTextButton extends StatelessWidget {
 }
 
 class SecondaryButton extends StatelessWidget {
+  const SecondaryButton({
+    super.key,
+    required this.child,
+    this.onPressed,
+    this.mode = TextButtonMode.normal,
+  });
+
   final Widget child;
   final VoidCallback? onPressed;
-  final bool bigMode;
-
-  const SecondaryButton(
-      {Key? key, required this.child, this.onPressed, this.bigMode = false})
-      : super(key: key);
+  final TextButtonMode mode;
 
   @override
   Widget build(BuildContext context) {
+    final size = mode.size;
     return BaseStyledButton(
-      minWidth: bigMode ? 100 : 80,
-      minHeight: bigMode ? 40 : 38,
+      minWidth: size.width,
+      minHeight: size.height,
       contentPadding: EdgeInsets.zero,
       bgColor: Theme.of(context).colorScheme.surface,
       outlineColor: Theme.of(context).colorScheme.primary,
-      borderRadius: bigMode ? Corners.s12Border : Corners.s8Border,
+      borderRadius: mode.borderRadius,
       onPressed: onPressed,
       child: child,
     );

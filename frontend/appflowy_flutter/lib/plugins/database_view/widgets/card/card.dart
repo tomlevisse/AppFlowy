@@ -1,10 +1,12 @@
+import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/plugins/database_view/application/cell/cell_service.dart';
 import 'package:appflowy/plugins/database_view/application/row/row_cache.dart';
 import 'package:appflowy/plugins/database_view/grid/presentation/widgets/row/action.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/row_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/row_entities.pb.dart';
 import 'package:appflowy_popover/appflowy_popover.dart';
-import 'package:flowy_infra/image.dart';
+
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
+import 'package:flowy_infra_ui/style_widget/hover.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -16,9 +18,10 @@ import 'container/card_container.dart';
 
 /// Edit a database row with card style widget
 class RowCard<CustomCardData> extends StatefulWidget {
-  final RowPB row;
+  final RowMetaPB rowMeta;
   final String viewId;
   final String? groupingFieldId;
+  final String? groupId;
 
   /// Allows passing a custom card data object to the card. The card will be
   /// returned in the [CardCellBuilder] and can be used to build the card.
@@ -45,9 +48,10 @@ class RowCard<CustomCardData> extends StatefulWidget {
   final RowCardStyleConfiguration styleConfiguration;
 
   const RowCard({
-    required this.row,
+    required this.rowMeta,
     required this.viewId,
     this.groupingFieldId,
+    this.groupId,
     required this.isEditing,
     required this.rowCache,
     required this.cellBuilder,
@@ -68,9 +72,9 @@ class RowCard<CustomCardData> extends StatefulWidget {
 }
 
 class _RowCardState<T> extends State<RowCard<T>> {
-  late CardBloc _cardBloc;
-  late EditableRowNotifier rowNotifier;
-  late PopoverController popoverController;
+  late final CardBloc _cardBloc;
+  late final EditableRowNotifier rowNotifier;
+  late final PopoverController popoverController;
   AccessoryType? accessoryType;
 
   @override
@@ -80,7 +84,7 @@ class _RowCardState<T> extends State<RowCard<T>> {
       viewId: widget.viewId,
       groupFieldId: widget.groupingFieldId,
       isEditing: widget.isEditing,
-      row: widget.row,
+      rowMeta: widget.rowMeta,
       rowCache: widget.rowCache,
     )..add(const RowCardEvent.initial());
 
@@ -136,7 +140,7 @@ class _RowCardState<T> extends State<RowCard<T>> {
                 } else {
                   return [
                     _CardEditOption(rowNotifier: rowNotifier),
-                    _CardMoreOption(),
+                    CardMoreOption(),
                   ];
                 }
               },
@@ -177,7 +181,9 @@ class _RowCardState<T> extends State<RowCard<T>> {
         throw UnimplementedError();
       case AccessoryType.more:
         return RowActions(
-          rowData: context.read<CardBloc>().rowInfo(),
+          viewId: context.read<CardBloc>().viewId,
+          rowId: context.read<CardBloc>().rowMeta.id,
+          groupId: widget.groupId,
         );
     }
   }
@@ -193,7 +199,7 @@ class _RowCardState<T> extends State<RowCard<T>> {
 class _CardContent<CustomCardData> extends StatelessWidget {
   final CardCellBuilder<CustomCardData> cellBuilder;
   final EditableRowNotifier rowNotifier;
-  final List<CellIdentifier> cells;
+  final List<DatabaseCellContext> cells;
   final RowCardRenderHook<CustomCardData>? renderHook;
   final CustomCardData? cardData;
   final RowCardStyleConfiguration styleConfiguration;
@@ -209,36 +215,51 @@ class _CardContent<CustomCardData> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: _makeCells(context, cells),
+    if (styleConfiguration.hoverStyle != null) {
+      return FlowyHover(
+        style: styleConfiguration.hoverStyle,
+        child: Padding(
+          padding: styleConfiguration.cardPadding,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: _makeCells(context, cells),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: styleConfiguration.cardPadding,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: _makeCells(context, cells),
+      ),
     );
   }
 
   List<Widget> _makeCells(
     BuildContext context,
-    List<CellIdentifier> cells,
+    List<DatabaseCellContext> cells,
   ) {
     final List<Widget> children = [];
     // Remove all the cell listeners.
     rowNotifier.unbind();
 
     cells.asMap().forEach(
-      (int index, CellIdentifier cell) {
+      (int index, DatabaseCellContext cellContext) {
         final isEditing = index == 0 ? rowNotifier.isEditing.value : false;
         final cellNotifier = EditableCardNotifier(isEditing: isEditing);
 
         if (index == 0) {
           // Only use the first cell to receive user's input when click the edit
           // button
-          rowNotifier.bindCell(cell, cellNotifier);
+          rowNotifier.bindCell(cellContext, cellNotifier);
         }
 
         final child = Padding(
-          key: cell.key(),
+          key: cellContext.key(),
           padding: styleConfiguration.cellPadding,
           child: cellBuilder.buildCell(
-            cellId: cell,
+            cellContext: cellContext,
             cellNotifier: cellNotifier,
             renderHook: renderHook,
             cardData: cardData,
@@ -252,15 +273,15 @@ class _CardContent<CustomCardData> extends StatelessWidget {
   }
 }
 
-class _CardMoreOption extends StatelessWidget with CardAccessory {
-  _CardMoreOption({Key? key}) : super(key: key);
+class CardMoreOption extends StatelessWidget with CardAccessory {
+  CardMoreOption({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(3.0),
-      child: svgWidget(
-        'grid/details',
+      child: FlowySvg(
+        FlowySvgs.details_s,
         color: Theme.of(context).iconTheme.color,
       ),
     );
@@ -281,8 +302,8 @@ class _CardEditOption extends StatelessWidget with CardAccessory {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(3.0),
-      child: svgWidget(
-        'editor/edit',
+      child: FlowySvg(
+        FlowySvgs.edit_s,
         color: Theme.of(context).iconTheme.color,
       ),
     );
@@ -298,9 +319,13 @@ class _CardEditOption extends StatelessWidget with CardAccessory {
 class RowCardStyleConfiguration {
   final bool showAccessory;
   final EdgeInsets cellPadding;
+  final EdgeInsets cardPadding;
+  final HoverStyle? hoverStyle;
 
   const RowCardStyleConfiguration({
     this.showAccessory = true,
     this.cellPadding = const EdgeInsets.only(left: 4, right: 4),
+    this.cardPadding = const EdgeInsets.all(8),
+    this.hoverStyle,
   });
 }

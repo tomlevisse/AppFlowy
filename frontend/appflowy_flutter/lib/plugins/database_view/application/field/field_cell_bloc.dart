@@ -1,5 +1,6 @@
-import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/field_entities.pb.dart';
+import 'dart:math';
+
+import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pb.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'dart:async';
@@ -14,13 +15,14 @@ class FieldCellBloc extends Bloc<FieldCellEvent, FieldCellState> {
   final FieldBackendService _fieldBackendSvc;
 
   FieldCellBloc({
-    required FieldCellContext cellContext,
-  })  : _fieldListener = SingleFieldListener(fieldId: cellContext.field.id),
+    required FieldContext fieldContext,
+  })  : _fieldListener =
+            SingleFieldListener(fieldId: fieldContext.fieldInfo.id),
         _fieldBackendSvc = FieldBackendService(
-          viewId: cellContext.viewId,
-          fieldId: cellContext.field.id,
+          viewId: fieldContext.viewId,
+          fieldId: fieldContext.fieldInfo.id,
         ),
-        super(FieldCellState.initial(cellContext)) {
+        super(FieldCellState.initial(fieldContext)) {
     on<FieldCellEvent>(
       (event, emit) async {
         event.when(
@@ -28,10 +30,13 @@ class FieldCellBloc extends Bloc<FieldCellEvent, FieldCellState> {
             _startListening();
           },
           didReceiveFieldUpdate: (field) {
-            emit(state.copyWith(field: cellContext.field));
+            emit(state.copyWith(field: fieldContext.fieldInfo.field));
+          },
+          onResizeStart: () {
+            emit(state.copyWith(resizeStart: state.width));
           },
           startUpdateWidth: (offset) {
-            final width = state.width + offset;
+            final width = max(offset + state.resizeStart, 50).toDouble();
             emit(state.copyWith(width: width));
           },
           endUpdateWidth: () {
@@ -52,14 +57,11 @@ class FieldCellBloc extends Bloc<FieldCellEvent, FieldCellState> {
 
   void _startListening() {
     _fieldListener.start(
-      onFieldChanged: (result) {
+      onFieldChanged: (updatedField) {
         if (isClosed) {
           return;
         }
-        result.fold(
-          (field) => add(FieldCellEvent.didReceiveFieldUpdate(field)),
-          (err) => Log.error(err),
-        );
+        add(FieldCellEvent.didReceiveFieldUpdate(updatedField));
       },
     );
   }
@@ -70,6 +72,7 @@ class FieldCellEvent with _$FieldCellEvent {
   const factory FieldCellEvent.initial() = _InitialCell;
   const factory FieldCellEvent.didReceiveFieldUpdate(FieldPB field) =
       _DidReceiveFieldUpdate;
+  const factory FieldCellEvent.onResizeStart() = _OnResizeStart;
   const factory FieldCellEvent.startUpdateWidth(double offset) =
       _StartUpdateWidth;
   const factory FieldCellEvent.endUpdateWidth() = _EndUpdateWidth;
@@ -81,12 +84,13 @@ class FieldCellState with _$FieldCellState {
     required String viewId,
     required FieldPB field,
     required double width,
+    required double resizeStart,
   }) = _FieldCellState;
 
-  factory FieldCellState.initial(FieldCellContext cellContext) =>
-      FieldCellState(
+  factory FieldCellState.initial(FieldContext cellContext) => FieldCellState(
         viewId: cellContext.viewId,
-        field: cellContext.field,
-        width: cellContext.field.width.toDouble(),
+        field: cellContext.fieldInfo.field,
+        width: cellContext.fieldInfo.field.width.toDouble(),
+        resizeStart: 0,
       );
 }

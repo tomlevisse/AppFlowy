@@ -1,13 +1,19 @@
 import 'dart:async';
 import 'dart:collection';
 
+import 'package:appflowy/plugins/database_view/application/defines.dart';
+import 'package:appflowy/plugins/database_view/application/field/field_info.dart';
+import 'package:appflowy/plugins/database_view/application/group/group_service.dart';
+import 'package:appflowy/plugins/database_view/application/row/row_service.dart';
 import 'package:appflowy_board/appflowy_board.dart';
+import 'package:collection/collection.dart';
 import 'package:dartz/dartz.dart';
 import 'package:equatable/equatable.dart';
 import 'package:appflowy_backend/log.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-folder/view.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/protobuf.dart';
+import 'package:appflowy_backend/protobuf/flowy-folder2/view.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/protobuf.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -19,57 +25,44 @@ import 'group_controller.dart';
 part 'board_bloc.freezed.dart';
 
 class BoardBloc extends Bloc<BoardEvent, BoardState> {
-  final DatabaseController _databaseController;
+  late final GroupBackendService groupBackendSvc;
+  final DatabaseController databaseController;
   late final AppFlowyBoardController boardController;
   final LinkedHashMap<String, GroupController> groupControllers =
       LinkedHashMap();
+  GroupPB? ungroupedGroup;
 
-  FieldController get fieldController => _databaseController.fieldController;
-  String get viewId => _databaseController.viewId;
+  FieldController get fieldController => databaseController.fieldController;
+  String get viewId => databaseController.viewId;
 
-  BoardBloc({required ViewPB view})
-      : _databaseController = DatabaseController(
-          view: view,
-          layoutType: LayoutTypePB.Board,
-        ),
-        super(BoardState.initial(view.id)) {
+  BoardBloc({
+    required ViewPB view,
+    required this.databaseController,
+  }) : super(BoardState.initial(view.id)) {
+    groupBackendSvc = GroupBackendService(viewId);
     boardController = AppFlowyBoardController(
-      onMoveGroup: (
-        fromGroupId,
-        fromIndex,
-        toGroupId,
-        toIndex,
-      ) {
-        _databaseController.moveGroup(
+      onMoveGroup: (fromGroupId, fromIndex, toGroupId, toIndex) {
+        databaseController.moveGroup(
           fromGroupId: fromGroupId,
           toGroupId: toGroupId,
         );
       },
-      onMoveGroupItem: (
-        groupId,
-        fromIndex,
-        toIndex,
-      ) {
+      onMoveGroupItem: (groupId, fromIndex, toIndex) {
         final fromRow = groupControllers[groupId]?.rowAtIndex(fromIndex);
         final toRow = groupControllers[groupId]?.rowAtIndex(toIndex);
         if (fromRow != null) {
-          _databaseController.moveRow(
+          databaseController.moveGroupRow(
             fromRow: fromRow,
             toRow: toRow,
             groupId: groupId,
           );
         }
       },
-      onMoveGroupItemToGroup: (
-        fromGroupId,
-        fromIndex,
-        toGroupId,
-        toIndex,
-      ) {
+      onMoveGroupItemToGroup: (fromGroupId, fromIndex, toGroupId, toIndex) {
         final fromRow = groupControllers[fromGroupId]?.rowAtIndex(fromIndex);
         final toRow = groupControllers[toGroupId]?.rowAtIndex(toIndex);
         if (fromRow != null) {
-          _databaseController.moveRow(
+          databaseController.moveGroupRow(
             fromRow: fromRow,
             toRow: toRow,
             groupId: toGroupId,
@@ -87,7 +80,7 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
           },
           createBottomRow: (groupId) async {
             final startRowId = groupControllers[groupId]?.lastRow()?.id;
-            final result = await _databaseController.createRow(
+            final result = await databaseController.createRow(
               groupId: groupId,
               startRowId: startRowId,
             );
@@ -97,8 +90,11 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
             );
           },
           createHeaderRow: (String groupId) async {
-            final result =
-                await _databaseController.createRow(groupId: groupId);
+            final result = await databaseController.createRow(
+              groupId: groupId,
+              fromBeginning: true,
+            );
+
             result.fold(
               (_) {},
               (err) => Log.error(err),
@@ -107,12 +103,11 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
           didCreateRow: (group, row, int? index) {
             emit(
               state.copyWith(
-                editingRow: Some(
-                  BoardEditingRow(
-                    group: group,
-                    row: row,
-                    index: index,
-                  ),
+                isEditingRow: true,
+                editingRow: BoardEditingRow(
+                  group: group,
+                  row: row,
+                  index: index,
                 ),
               ),
             );
@@ -121,23 +116,27 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
           startEditingRow: (group, row) {
             emit(
               state.copyWith(
-                editingRow: Some(
-                  BoardEditingRow(
-                    group: group,
-                    row: row,
-                    index: null,
-                  ),
+                isEditingRow: true,
+                editingRow: BoardEditingRow(
+                  group: group,
+                  row: row,
+                  index: null,
                 ),
               ),
             );
             _groupItemStartEditing(group, row, true);
           },
           endEditingRow: (rowId) {
-            state.editingRow.fold(() => null, (editingRow) {
-              assert(editingRow.row.id == rowId);
-              _groupItemStartEditing(editingRow.group, editingRow.row, false);
-              emit(state.copyWith(editingRow: none()));
-            });
+            if (state.editingRow != null && state.isEditingRow) {
+              assert(state.editingRow!.row.id == rowId);
+              _groupItemStartEditing(
+                state.editingRow!.group,
+                state.editingRow!.row,
+                false,
+              );
+
+              emit(state.copyWith(isEditingRow: false, editingRow: null));
+            }
           },
           didReceiveGridUpdate: (DatabasePB grid) {
             emit(state.copyWith(grid: Some(grid)));
@@ -152,12 +151,29 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
               ),
             );
           },
+          didUpdateLayoutSettings: (layoutSettings) {
+            emit(state.copyWith(layoutSettings: layoutSettings));
+          },
+          startEditingHeader: (String groupId) {
+            emit(
+              state.copyWith(isEditingHeader: true, editingHeaderId: groupId),
+            );
+          },
+          endEditingHeader: (String groupId, String groupName) async {
+            await groupBackendSvc.updateGroup(
+              fieldId: groupControllers.values.first.group.fieldId,
+              groupId: groupId,
+              name: groupName,
+            );
+
+            emit(state.copyWith(isEditingHeader: false));
+          },
         );
       },
     );
   }
 
-  void _groupItemStartEditing(GroupPB group, RowPB row, bool isEdit) {
+  void _groupItemStartEditing(GroupPB group, RowMetaPB row, bool isEdit) {
     final fieldInfo = fieldController.getField(group.fieldId);
     if (fieldInfo == null) {
       Log.warn("fieldInfo should not be null");
@@ -169,7 +185,6 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
 
   @override
   Future<void> close() async {
-    await _databaseController.dispose();
     for (final controller in groupControllers.values) {
       controller.dispose();
     }
@@ -177,11 +192,22 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
   }
 
   void initializeGroups(List<GroupPB> groups) {
-    for (var controller in groupControllers.values) {
+    for (final controller in groupControllers.values) {
       controller.dispose();
     }
     groupControllers.clear();
     boardController.clear();
+
+    final ungroupedGroupIndex =
+        groups.indexWhere((group) => group.groupId == group.fieldId);
+
+    if (ungroupedGroupIndex != -1) {
+      ungroupedGroup = groups[ungroupedGroupIndex];
+      final group = groups.removeAt(ungroupedGroupIndex);
+      if (!(state.layoutSettings?.hideUngroupedColumn ?? false)) {
+        groups.add(group);
+      }
+    }
 
     boardController.addGroups(
       groups
@@ -196,8 +222,8 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
     }
   }
 
-  RowCache? getRowCache(String blockId) {
-    return _databaseController.rowCache;
+  RowCache? getRowCache() {
+    return databaseController.rowCache;
   }
 
   void _startListening() {
@@ -208,9 +234,26 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
         }
       },
     );
+    final onLayoutSettingsChanged = DatabaseLayoutSettingCallbacks(
+      onLayoutSettingsChanged: (layoutSettings) {
+        if (isClosed || !layoutSettings.hasBoard()) {
+          return;
+        }
+        if (ungroupedGroup != null) {
+          if (layoutSettings.board.hideUngroupedColumn) {
+            boardController.removeGroup(ungroupedGroup!.fieldId);
+          } else {
+            final newGroup = initializeGroupData(ungroupedGroup!);
+            boardController.addGroup(newGroup);
+          }
+        }
+        add(BoardEvent.didUpdateLayoutSettings(layoutSettings.board));
+      },
+    );
     final onGroupChanged = GroupCallbacks(
       onGroupByField: (groups) {
         if (isClosed) return;
+        ungroupedGroup = null;
         initializeGroups(groups);
         add(BoardEvent.didReceiveGroups(groups));
       },
@@ -231,13 +274,14 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
         for (final group in updatedGroups) {
           final columnController =
               boardController.getGroupController(group.groupId);
-          columnController?.updateGroupName(group.desc);
+          columnController?.updateGroupName(group.groupName);
         }
       },
     );
 
-    _databaseController.setListener(
+    databaseController.addListener(
       onDatabaseChanged: onDatabaseChanged,
+      onLayoutSettingsChanged: onLayoutSettingsChanged,
       onGroupChanged: onGroupChanged,
     );
   }
@@ -255,13 +299,16 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
   }
 
   Future<void> _openGrid(Emitter<BoardState> emit) async {
-    final result = await _databaseController.open();
+    final result = await databaseController.open();
     result.fold(
-      (grid) => emit(
-        state.copyWith(loadingState: GridLoadingState.finish(left(unit))),
-      ),
+      (grid) {
+        databaseController.setIsLoading(false);
+        emit(
+          state.copyWith(loadingState: LoadingState.finish(left(unit))),
+        );
+      },
       (err) => emit(
-        state.copyWith(loadingState: GridLoadingState.finish(right(err))),
+        state.copyWith(loadingState: LoadingState.finish(right(err))),
       ),
     );
   }
@@ -286,7 +333,7 @@ class BoardBloc extends Bloc<BoardEvent, BoardState> {
   AppFlowyGroupData initializeGroupData(GroupPB group) {
     return AppFlowyGroupData(
       id: group.groupId,
-      name: group.desc,
+      name: group.groupName,
       items: _buildGroupItems(group),
       customData: GroupData(
         group: group,
@@ -301,22 +348,29 @@ class BoardEvent with _$BoardEvent {
   const factory BoardEvent.initial() = _InitialBoard;
   const factory BoardEvent.createBottomRow(String groupId) = _CreateBottomRow;
   const factory BoardEvent.createHeaderRow(String groupId) = _CreateHeaderRow;
+  const factory BoardEvent.startEditingHeader(String groupId) =
+      _StartEditingHeader;
+  const factory BoardEvent.endEditingHeader(String groupId, String groupName) =
+      _EndEditingHeader;
   const factory BoardEvent.didCreateRow(
     GroupPB group,
-    RowPB row,
+    RowMetaPB row,
     int? index,
   ) = _DidCreateRow;
   const factory BoardEvent.startEditingRow(
     GroupPB group,
-    RowPB row,
+    RowMetaPB row,
   ) = _StartEditRow;
-  const factory BoardEvent.endEditingRow(String rowId) = _EndEditRow;
+  const factory BoardEvent.endEditingRow(RowId rowId) = _EndEditRow;
   const factory BoardEvent.didReceiveError(FlowyError error) = _DidReceiveError;
   const factory BoardEvent.didReceiveGridUpdate(
     DatabasePB grid,
   ) = _DidReceiveGridUpdate;
   const factory BoardEvent.didReceiveGroups(List<GroupPB> groups) =
       _DidReceiveGroups;
+  const factory BoardEvent.didUpdateLayoutSettings(
+    BoardLayoutSettingPB layoutSettings,
+  ) = _DidUpdateLayoutSettings;
 }
 
 @freezed
@@ -325,27 +379,25 @@ class BoardState with _$BoardState {
     required String viewId,
     required Option<DatabasePB> grid,
     required List<String> groupIds,
-    required Option<BoardEditingRow> editingRow,
-    required GridLoadingState loadingState,
+    required bool isEditingHeader,
+    String? editingHeaderId,
+    required bool isEditingRow,
+    BoardEditingRow? editingRow,
+    required LoadingState loadingState,
     required Option<FlowyError> noneOrError,
+    required BoardLayoutSettingPB? layoutSettings,
   }) = _BoardState;
 
   factory BoardState.initial(String viewId) => BoardState(
         grid: none(),
         viewId: viewId,
         groupIds: [],
-        editingRow: none(),
+        isEditingHeader: false,
+        isEditingRow: false,
         noneOrError: none(),
-        loadingState: const _Loading(),
+        loadingState: const LoadingState.loading(),
+        layoutSettings: null,
       );
-}
-
-@freezed
-class GridLoadingState with _$GridLoadingState {
-  const factory GridLoadingState.loading() = _Loading;
-  const factory GridLoadingState.finish(
-    Either<Unit, FlowyError> successOrFail,
-  ) = _Finish;
 }
 
 class GridFieldEquatable extends Equatable {
@@ -372,7 +424,7 @@ class GridFieldEquatable extends Equatable {
 }
 
 class GroupItem extends AppFlowyGroupItem {
-  final RowPB row;
+  final RowMetaPB row;
   final FieldInfo fieldInfo;
 
   GroupItem({
@@ -384,13 +436,13 @@ class GroupItem extends AppFlowyGroupItem {
   }
 
   @override
-  String get id => row.id;
+  String get id => row.id.toString();
 }
 
 class GroupControllerDelegateImpl extends GroupControllerDelegate {
   final FieldController fieldController;
   final AppFlowyBoardController controller;
-  final void Function(String, RowPB, int?) onNewColumnItem;
+  final void Function(String, RowMetaPB, int?) onNewColumnItem;
 
   GroupControllerDelegateImpl({
     required this.controller,
@@ -399,7 +451,7 @@ class GroupControllerDelegateImpl extends GroupControllerDelegate {
   });
 
   @override
-  void insertRow(GroupPB group, RowPB row, int? index) {
+  void insertRow(GroupPB group, RowMetaPB row, int? index) {
     final fieldInfo = fieldController.getField(group.fieldId);
     if (fieldInfo == null) {
       Log.warn("fieldInfo should not be null");
@@ -422,12 +474,12 @@ class GroupControllerDelegateImpl extends GroupControllerDelegate {
   }
 
   @override
-  void removeRow(GroupPB group, String rowId) {
-    controller.removeGroupItem(group.groupId, rowId);
+  void removeRow(GroupPB group, RowId rowId) {
+    controller.removeGroupItem(group.groupId, rowId.toString());
   }
 
   @override
-  void updateRow(GroupPB group, RowPB row) {
+  void updateRow(GroupPB group, RowMetaPB row) {
     final fieldInfo = fieldController.getField(group.fieldId);
     if (fieldInfo == null) {
       Log.warn("fieldInfo should not be null");
@@ -443,7 +495,7 @@ class GroupControllerDelegateImpl extends GroupControllerDelegate {
   }
 
   @override
-  void addNewRow(GroupPB group, RowPB row, int? index) {
+  void addNewRow(GroupPB group, RowMetaPB row, int? index) {
     final fieldInfo = fieldController.getField(group.fieldId);
     if (fieldInfo == null) {
       Log.warn("fieldInfo should not be null");
@@ -466,7 +518,7 @@ class GroupControllerDelegateImpl extends GroupControllerDelegate {
 
 class BoardEditingRow {
   GroupPB group;
-  RowPB row;
+  RowMetaPB row;
   int? index;
 
   BoardEditingRow({

@@ -1,8 +1,8 @@
-import 'package:appflowy/plugins/document/presentation/plugins/openai/service/openai_client.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/service/openai_client.dart';
 import 'package:mocktail/mocktail.dart';
 import 'dart:convert';
-import 'package:appflowy/plugins/document/presentation/plugins/openai/service/text_completion.dart';
-import 'package:appflowy/plugins/document/presentation/plugins/openai/service/error.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/service/text_completion.dart';
+import 'package:appflowy/plugins/document/presentation/editor_plugins/openai/service/error.dart';
 import 'package:http/http.dart' as http;
 import 'dart:async';
 
@@ -12,8 +12,11 @@ class MyMockClient extends Mock implements http.Client {
     final requestType = request.method;
     final requestUri = request.url;
 
-    if (requestType == 'POST' && requestUri == OpenAIRequestType.textCompletion.uri) {
-      final responseHeaders = <String, String>{'content-type': 'text/event-stream'};
+    if (requestType == 'POST' &&
+        requestUri == OpenAIRequestType.textCompletion.uri) {
+      final responseHeaders = <String, String>{
+        'content-type': 'text/event-stream'
+      };
       final responseBody = Stream.fromIterable([
         utf8.encode(
           '{ "choices": [{"text": "Lorem ipsum dolor sit amet, consectetuer adipiscing elit. Aenean commodo ligula ", "index": 0, "logprobs": null, "finish_reason": null}]}',
@@ -51,7 +54,9 @@ class MockOpenAIRepository extends HttpOpenAIRepository {
 
     var previousSyntax = '';
     if (response.statusCode == 200) {
-      await for (final chunk in response.stream.transform(const Utf8Decoder()).transform(const LineSplitter())) {
+      await for (final chunk in response.stream
+          .transform(const Utf8Decoder())
+          .transform(const LineSplitter())) {
         await onStart();
         final data = chunk.trim().split('data: ');
         if (data[0] != '[DONE]') {

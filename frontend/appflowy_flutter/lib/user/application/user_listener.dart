@@ -1,13 +1,13 @@
 import 'dart:async';
-import 'package:appflowy/core/folder_notification.dart';
-import 'package:appflowy/core/user_notification.dart';
+import 'package:appflowy/core/notification/folder_notification.dart';
+import 'package:appflowy/core/notification/user_notification.dart';
 import 'package:dartz/dartz.dart';
-import 'package:appflowy_backend/protobuf/flowy-folder/workspace.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-folder2/workspace.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
 import 'dart:typed_data';
 import 'package:flowy_infra/notifier.dart';
 import 'package:appflowy_backend/protobuf/flowy-notification/protobuf.dart';
-import 'package:appflowy_backend/protobuf/flowy-folder/notification.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-folder2/notification.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/user_profile.pb.dart';
 import 'package:appflowy_backend/protobuf/flowy-user/notification.pb.dart'
     as user;
@@ -18,7 +18,6 @@ typedef AuthNotifyValue = Either<Unit, FlowyError>;
 
 class UserListener {
   StreamSubscription<SubscribeObject>? _subscription;
-  PublishNotifier<AuthNotifyValue>? _authNotifier = PublishNotifier();
   PublishNotifier<UserProfileNotifyValue>? _profileNotifier = PublishNotifier();
 
   UserNotificationParser? _userParser;
@@ -28,19 +27,14 @@ class UserListener {
   }) : _userProfile = userProfile;
 
   void start({
-    void Function(AuthNotifyValue)? onAuthChanged,
     void Function(UserProfileNotifyValue)? onProfileUpdated,
   }) {
     if (onProfileUpdated != null) {
       _profileNotifier?.addPublishListener(onProfileUpdated);
     }
 
-    if (onAuthChanged != null) {
-      _authNotifier?.addPublishListener(onAuthChanged);
-    }
-
     _userParser = UserNotificationParser(
-      id: _userProfile.token,
+      id: _userProfile.id.toString(),
       callback: _userNotificationCallback,
     );
     _subscription = RustStreamReceiver.listen((observable) {
@@ -53,9 +47,6 @@ class UserListener {
     await _subscription?.cancel();
     _profileNotifier?.dispose();
     _profileNotifier = null;
-
-    _authNotifier?.dispose();
-    _authNotifier = null;
   }
 
   void _userNotificationCallback(
@@ -76,13 +67,9 @@ class UserListener {
   }
 }
 
-typedef WorkspaceListNotifyValue = Either<List<WorkspacePB>, FlowyError>;
 typedef WorkspaceSettingNotifyValue = Either<WorkspaceSettingPB, FlowyError>;
 
 class UserWorkspaceListener {
-  PublishNotifier<AuthNotifyValue>? _authNotifier = PublishNotifier();
-  PublishNotifier<WorkspaceListNotifyValue>? _workspacesChangedNotifier =
-      PublishNotifier();
   PublishNotifier<WorkspaceSettingNotifyValue>? _settingChangedNotifier =
       PublishNotifier();
 
@@ -93,18 +80,8 @@ class UserWorkspaceListener {
   });
 
   void start({
-    void Function(AuthNotifyValue)? onAuthChanged,
-    void Function(WorkspaceListNotifyValue)? onWorkspacesUpdated,
     void Function(WorkspaceSettingNotifyValue)? onSettingUpdated,
   }) {
-    if (onAuthChanged != null) {
-      _authNotifier?.addPublishListener(onAuthChanged);
-    }
-
-    if (onWorkspacesUpdated != null) {
-      _workspacesChangedNotifier?.addPublishListener(onWorkspacesUpdated);
-    }
-
     if (onSettingUpdated != null) {
       _settingChangedNotifier?.addPublishListener(onSettingUpdated);
     }
@@ -122,14 +99,6 @@ class UserWorkspaceListener {
     Either<Uint8List, FlowyError> result,
   ) {
     switch (ty) {
-      case FolderNotification.DidCreateWorkspace:
-      case FolderNotification.DidDeleteWorkspace:
-        result.fold(
-          (payload) => _workspacesChangedNotifier?.value =
-              left(RepeatedWorkspacePB.fromBuffer(payload).items),
-          (error) => _workspacesChangedNotifier?.value = right(error),
-        );
-        break;
       case FolderNotification.DidUpdateWorkspaceSetting:
         result.fold(
           (payload) => _settingChangedNotifier?.value =
@@ -144,13 +113,8 @@ class UserWorkspaceListener {
 
   Future<void> stop() async {
     await _listener?.stop();
-    _workspacesChangedNotifier?.dispose();
-    _workspacesChangedNotifier = null;
 
     _settingChangedNotifier?.dispose();
     _settingChangedNotifier = null;
-
-    _authNotifier?.dispose();
-    _authNotifier = null;
   }
 }

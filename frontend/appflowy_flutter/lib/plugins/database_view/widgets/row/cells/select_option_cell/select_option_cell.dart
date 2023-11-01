@@ -1,7 +1,7 @@
 import 'package:appflowy/plugins/database_view/application/cell/cell_controller_builder.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/select_option.pb.dart';
 import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/select_type_option.pb.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -13,9 +13,11 @@ import 'select_option_editor.dart';
 
 class SelectOptionCellStyle extends GridCellStyle {
   String placeholder;
+  EdgeInsets? cellPadding;
 
   SelectOptionCellStyle({
     required this.placeholder,
+    this.cellPadding,
   });
 }
 
@@ -62,7 +64,7 @@ class _SingleSelectCellState extends GridCellState<GridSingleSelectCell> {
           return SelectOptionWrap(
             selectOptions: state.selectedOptions,
             cellStyle: widget.cellStyle,
-            onCellEditing: widget.onCellEditing,
+            onCellEditing: widget.onCellFocus,
             popoverController: _popover,
             cellControllerBuilder: widget.cellControllerBuilder,
           );
@@ -125,7 +127,7 @@ class _MultiSelectCellState extends GridCellState<GridMultiSelectCell> {
           return SelectOptionWrap(
             selectOptions: state.selectedOptions,
             cellStyle: widget.cellStyle,
-            onCellEditing: widget.onCellEditing,
+            onCellEditing: widget.onCellFocus,
             popoverController: _popover,
             cellControllerBuilder: widget.cellControllerBuilder,
           );
@@ -167,13 +169,10 @@ class SelectOptionWrap extends StatefulWidget {
 class _SelectOptionWrapState extends State<SelectOptionWrap> {
   @override
   Widget build(BuildContext context) {
-    Widget child = _buildOptions(context);
+    final Widget child = _buildOptions(context);
 
     final constraints = BoxConstraints.loose(
-      Size(
-        SelectOptionCellEditor.editorPanelWidth,
-        300,
-      ),
+      Size(SelectOptionCellEditor.editorPanelWidth, 300),
     );
     return AppFlowyPopover(
       controller: widget.popoverController,
@@ -191,7 +190,7 @@ class _SelectOptionWrapState extends State<SelectOptionWrap> {
       },
       onClose: () => widget.onCellEditing.value = false,
       child: Padding(
-        padding: GridSize.cellContentInsets,
+        padding: widget.cellStyle?.cellPadding ?? GridSize.cellContentInsets,
         child: child,
       ),
     );
@@ -200,9 +199,12 @@ class _SelectOptionWrapState extends State<SelectOptionWrap> {
   Widget _buildOptions(BuildContext context) {
     final Widget child;
     if (widget.selectOptions.isEmpty && widget.cellStyle != null) {
-      child = FlowyText.medium(
-        widget.cellStyle!.placeholder,
-        color: Theme.of(context).hintColor,
+      child = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 1),
+        child: FlowyText.medium(
+          widget.cellStyle!.placeholder,
+          color: Theme.of(context).hintColor,
+        ),
       );
     } else {
       final children = widget.selectOptions.map(

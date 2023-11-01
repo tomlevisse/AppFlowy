@@ -1,5 +1,4 @@
-import 'package:appflowy_backend/protobuf/flowy-database/date_type_option.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/date_type_option_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/date_entities.pb.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:protobuf/protobuf.dart';
@@ -28,22 +27,14 @@ class DateTypeOptionBloc
               ),
             );
           },
-          includeTime: (_IncludeTime value) {
-            emit(
-              state.copyWith(
-                typeOption: _updateTypeOption(includeTime: value.includeTime),
-              ),
-            );
-          },
         );
       },
     );
   }
 
   DateTypeOptionPB _updateTypeOption({
-    DateFormat? dateFormat,
-    TimeFormat? timeFormat,
-    bool? includeTime,
+    DateFormatPB? dateFormat,
+    TimeFormatPB? timeFormat,
   }) {
     state.typeOption.freeze();
     return state.typeOption.rebuild((typeOption) {
@@ -54,22 +45,16 @@ class DateTypeOptionBloc
       if (timeFormat != null) {
         typeOption.timeFormat = timeFormat;
       }
-
-      if (includeTime != null) {
-        typeOption.includeTime = includeTime;
-      }
     });
   }
 }
 
 @freezed
 class DateTypeOptionEvent with _$DateTypeOptionEvent {
-  const factory DateTypeOptionEvent.didSelectDateFormat(DateFormat format) =
+  const factory DateTypeOptionEvent.didSelectDateFormat(DateFormatPB format) =
       _DidSelectDateFormat;
-  const factory DateTypeOptionEvent.didSelectTimeFormat(TimeFormat format) =
+  const factory DateTypeOptionEvent.didSelectTimeFormat(TimeFormatPB format) =
       _DidSelectTimeFormat;
-  const factory DateTypeOptionEvent.includeTime(bool includeTime) =
-      _IncludeTime;
 }
 
 @freezed

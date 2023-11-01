@@ -1,26 +1,37 @@
 import 'dart:async';
 import 'package:appflowy/plugins/database_view/application/cell/cell_controller_builder.dart';
 import 'package:appflowy/plugins/database_view/widgets/row/cells/text_cell/text_cell_bloc.dart';
+import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../grid/presentation/layout/sizes.dart';
 import '../../cell_builder.dart';
 
 class GridTextCellStyle extends GridCellStyle {
-  String? placeholder;
-  TextStyle? textStyle;
-  bool? autofocus;
+  final String? placeholder;
+  final TextStyle? textStyle;
+  final EdgeInsets? cellPadding;
+  final bool autofocus;
+  final double emojiFontSize;
+  final double emojiHPadding;
+  final bool showEmoji;
+  final bool useRoundedBorder;
 
-  GridTextCellStyle({
+  const GridTextCellStyle({
     this.placeholder,
     this.textStyle,
-    this.autofocus,
+    this.cellPadding,
+    this.autofocus = false,
+    this.showEmoji = true,
+    this.emojiFontSize = 16,
+    this.emojiHPadding = 4,
+    this.useRoundedBorder = false,
   });
 }
 
 class GridTextCell extends GridCellWidget {
   final CellControllerBuilder cellControllerBuilder;
-  late final GridTextCellStyle? cellStyle;
+  late final GridTextCellStyle cellStyle;
   GridTextCell({
     required this.cellControllerBuilder,
     GridCellStyle? style,
@@ -29,26 +40,29 @@ class GridTextCell extends GridCellWidget {
     if (style != null) {
       cellStyle = (style as GridTextCellStyle);
     } else {
-      cellStyle = null;
+      cellStyle = const GridTextCellStyle();
     }
   }
 
   @override
-  GridFocusNodeCellState<GridTextCell> createState() => _GridTextCellState();
+  GridEditableTextCell<GridTextCell> createState() => _GridTextCellState();
 }
 
-class _GridTextCellState extends GridFocusNodeCellState<GridTextCell> {
+class _GridTextCellState extends GridEditableTextCell<GridTextCell> {
   late TextCellBloc _cellBloc;
   late TextEditingController _controller;
 
   @override
+  SingleListenerFocusNode focusNode = SingleListenerFocusNode();
+
+  @override
   void initState() {
+    super.initState();
     final cellController =
         widget.cellControllerBuilder.build() as TextCellController;
-    _cellBloc = TextCellBloc(cellController: cellController);
-    _cellBloc.add(const TextCellEvent.initial());
+    _cellBloc = TextCellBloc(cellController: cellController)
+      ..add(const TextCellEvent.initial());
     _controller = TextEditingController(text: _cellBloc.state.content);
-    super.initState();
   }
 
   @override
@@ -62,26 +76,58 @@ class _GridTextCellState extends GridFocusNodeCellState<GridTextCell> {
           }
         },
         child: Padding(
-          padding: EdgeInsets.only(
-            left: GridSize.cellContentInsets.left,
-            right: GridSize.cellContentInsets.right,
-          ),
-          child: TextField(
-            controller: _controller,
-            focusNode: focusNode,
-            maxLines: null,
-            style: widget.cellStyle?.textStyle ??
-                Theme.of(context).textTheme.bodyMedium,
-            autofocus: widget.cellStyle?.autofocus ?? false,
-            decoration: InputDecoration(
-              contentPadding: EdgeInsets.only(
-                top: GridSize.cellContentInsets.top,
-                bottom: GridSize.cellContentInsets.bottom,
+          padding: widget.cellStyle.cellPadding ??
+              EdgeInsets.only(
+                left: GridSize.cellContentInsets.left,
+                right: GridSize.cellContentInsets.right,
               ),
-              border: InputBorder.none,
-              hintText: widget.cellStyle?.placeholder,
-              isDense: true,
-            ),
+          child: Row(
+            children: [
+              if (widget.cellStyle.showEmoji)
+                // Only build the emoji when it changes
+                BlocBuilder<TextCellBloc, TextCellState>(
+                  buildWhen: (p, c) => p.emoji != c.emoji,
+                  builder: (context, state) => Center(
+                    child: FlowyText(
+                      state.emoji,
+                      fontSize: widget.cellStyle.emojiFontSize,
+                    ),
+                  ),
+                ),
+              HSpace(widget.cellStyle.emojiHPadding),
+              Expanded(
+                child: widget.cellStyle.useRoundedBorder
+                    ? FlowyTextField(
+                        controller: _controller,
+                        textStyle: widget.cellStyle.textStyle ??
+                            Theme.of(context).textTheme.bodyMedium,
+                        focusNode: focusNode,
+                        autoFocus: widget.cellStyle.autofocus,
+                        hintText: widget.cellStyle.placeholder,
+                        onChanged: (text) => _cellBloc.add(
+                          TextCellEvent.updateText(text),
+                        ),
+                        debounceDuration: const Duration(milliseconds: 300),
+                      )
+                    : TextField(
+                        controller: _controller,
+                        focusNode: focusNode,
+                        maxLines: null,
+                        style: widget.cellStyle.textStyle ??
+                            Theme.of(context).textTheme.bodyMedium,
+                        autofocus: widget.cellStyle.autofocus,
+                        decoration: InputDecoration(
+                          contentPadding: EdgeInsets.only(
+                            top: GridSize.cellContentInsets.top,
+                            bottom: GridSize.cellContentInsets.bottom,
+                          ),
+                          border: InputBorder.none,
+                          hintText: widget.cellStyle.placeholder,
+                          isDense: true,
+                        ),
+                      ),
+              )
+            ],
           ),
         ),
       ),
@@ -96,11 +142,6 @@ class _GridTextCellState extends GridFocusNodeCellState<GridTextCell> {
 
   @override
   String? onCopy() => _cellBloc.state.content;
-
-  @override
-  void onInsert(String value) {
-    _cellBloc.add(TextCellEvent.updateText(value));
-  }
 
   @override
   Future<void> focusChanged() {

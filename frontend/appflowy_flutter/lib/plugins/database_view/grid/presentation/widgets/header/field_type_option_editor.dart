@@ -1,12 +1,13 @@
 import 'dart:typed_data';
+import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/plugins/database_view/application/field/field_type_option_edit_bloc.dart';
 import 'package:appflowy/plugins/database_view/application/field/type_option/type_option_data_controller.dart';
 import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:dartz/dartz.dart' show Either;
-import 'package:flowy_infra/image.dart';
+
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
 import 'package:appflowy_backend/protobuf/flowy-error/errors.pb.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/field_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pb.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../layout/sizes.dart';
@@ -47,8 +48,8 @@ class FieldTypeOptionEditor extends StatelessWidget {
             state: state,
           );
 
-          List<Widget> children = [
-            _SwitchFieldButton(popoverMutex: popoverMutex),
+          final List<Widget> children = [
+            SwitchFieldButton(popoverMutex: popoverMutex),
             if (typeOptionWidget != null) typeOptionWidget
           ];
 
@@ -73,9 +74,9 @@ class FieldTypeOptionEditor extends StatelessWidget {
   }
 }
 
-class _SwitchFieldButton extends StatelessWidget {
+class SwitchFieldButton extends StatelessWidget {
   final PopoverMutex popoverMutex;
-  const _SwitchFieldButton({
+  const SwitchFieldButton({
     required this.popoverMutex,
     Key? key,
   }) : super(key: key);
@@ -115,9 +116,8 @@ class _SwitchFieldButton extends StatelessWidget {
       text: FlowyText.medium(
         bloc.state.field.fieldType.title(),
       ),
-      margin: GridSize.typeOptionContentInsets,
-      leftIcon: FlowySvg(name: bloc.state.field.fieldType.iconName()),
-      rightIcon: const FlowySvg(name: 'grid/more'),
+      leftIcon: FlowySvg(bloc.state.field.fieldType.icon()),
+      rightIcon: const FlowySvg(FlowySvgs.more_s),
     );
   }
 }

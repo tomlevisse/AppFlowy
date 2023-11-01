@@ -4,7 +4,7 @@ import 'package:appflowy/workspace/presentation/widgets/pop_up_action.dart';
 import 'package:appflowy_popover/appflowy_popover.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/checklist_filter.pbenum.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/checklist_filter.pbenum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../condition_button.dart';
@@ -91,12 +91,16 @@ class ChecklistState extends State<ChecklistFilterEditor> {
             height: 20,
             child: Row(
               children: [
-                FlowyText(state.filterInfo.fieldInfo.name),
+                Expanded(
+                  child: FlowyText(
+                    state.filterInfo.fieldInfo.field.name,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 const HSpace(4),
-                ChecklistFilterConditionPBList(
+                ChecklistFilterConditionList(
                   filterInfo: state.filterInfo,
                 ),
-                const Spacer(),
                 DisclosureButton(
                   popoverMutex: widget.popoverMutex,
                   onAction: (action) {
@@ -118,9 +122,9 @@ class ChecklistState extends State<ChecklistFilterEditor> {
   }
 }
 
-class ChecklistFilterConditionPBList extends StatelessWidget {
+class ChecklistFilterConditionList extends StatelessWidget {
   final FilterInfo filterInfo;
-  const ChecklistFilterConditionPBList({
+  const ChecklistFilterConditionList({
     required this.filterInfo,
     Key? key,
   }) : super(key: key);

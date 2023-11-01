@@ -1,8 +1,7 @@
 import { FieldType } from '@/services/backend';
 import { FieldTypeIcon } from '$app/components/_shared/EditRow/FieldTypeIcon';
 import { FieldTypeName } from '$app/components/_shared/EditRow/FieldTypeName';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import useOutsideClick from '$app/components/_shared/useOutsideClick';
+import { Popover } from '@mui/material';
 
 const typesOrder: FieldType[] = [
   FieldType.RichText,
@@ -16,46 +15,36 @@ const typesOrder: FieldType[] = [
 ];
 
 export const ChangeFieldTypePopup = ({
-  top,
-  right,
+  open,
+  anchorEl,
   onClick,
   onOutsideClick,
 }: {
-  top: number;
-  right: number;
+  open: boolean;
+  anchorEl: HTMLDivElement | null;
   onClick: (newType: FieldType) => void;
   onOutsideClick: () => void;
 }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const [adjustedTop, setAdjustedTop] = useState(-100);
-  useOutsideClick(ref, async () => {
-    onOutsideClick();
-  });
-
-  useEffect(() => {
-    if (!ref.current) return;
-    const { height } = ref.current.getBoundingClientRect();
-    if (top + height > window.innerHeight) {
-      setAdjustedTop(window.innerHeight - height);
-    } else {
-      setAdjustedTop(top);
-    }
-  }, [ref, window, top, right]);
-
   return (
-    <div
-      ref={ref}
-      className={`fixed z-10 rounded-lg bg-white p-2 text-xs shadow-md transition-opacity duration-300 ${
-        adjustedTop === -100 ? 'opacity-0' : 'opacity-100'
-      }`}
-      style={{ top: `${adjustedTop}px`, left: `${right + 30}px` }}
+    <Popover
+      open={open}
+      anchorEl={anchorEl}
+      anchorOrigin={{
+        vertical: 'top',
+        horizontal: 'right',
+      }}
+      transformOrigin={{
+        vertical: 'top',
+        horizontal: 'left',
+      }}
+      onClose={onOutsideClick}
     >
-      <div className={'flex flex-col'}>
+      <div className={'flex flex-col p-2 text-xs'}>
         {typesOrder.map((t, i) => (
           <button
             onClick={() => onClick(t)}
             key={i}
-            className={'flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 pr-8 hover:bg-main-secondary'}
+            className={'flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 pr-8 hover:bg-fill-list-hover'}
           >
             <i className={'h-5 w-5'}>
               <FieldTypeIcon fieldType={t}></FieldTypeIcon>
@@ -66,6 +55,6 @@ export const ChangeFieldTypePopup = ({
           </button>
         ))}
       </div>
-    </div>
+    </Popover>
   );
 };

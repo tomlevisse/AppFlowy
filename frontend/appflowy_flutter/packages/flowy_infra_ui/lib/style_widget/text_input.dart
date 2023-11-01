@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:math' as math;
+
 import 'package:flowy_infra/size.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:textstyle_extensions/textstyle_extensions.dart';
 
 class FlowyFormTextInput extends StatelessWidget {
   static EdgeInsets kDefaultTextInputPadding =
@@ -62,7 +62,10 @@ class FlowyFormTextInput extends StatelessWidget {
         contentPadding: contentPadding ?? kDefaultTextInputPadding,
         border: const ThinUnderlineBorder(
             borderSide: BorderSide(width: 5, color: Colors.red)),
-        //focusedBorder: UnderlineInputBorder(borderSide: BorderSide(width: .5, color: Colors.red)),
+        hintStyle: Theme.of(context)
+            .textTheme
+            .bodyMedium!
+            .copyWith(color: Theme.of(context).hintColor.withOpacity(0.7)),
         hintText: hintText,
       ),
     );
@@ -221,7 +224,7 @@ class StyledSearchTextInputState extends State<StyledSearchTextInput> {
               hintStyle: Theme.of(context)
                   .textTheme
                   .bodyMedium!
-                  .textColor(Theme.of(context).hintColor),
+                  .copyWith(color: Theme.of(context).hintColor),
               labelText: widget.label,
             ),
       ),

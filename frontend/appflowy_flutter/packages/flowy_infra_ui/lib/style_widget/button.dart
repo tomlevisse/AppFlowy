@@ -1,6 +1,7 @@
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
 import 'package:flowy_infra_ui/style_widget/text.dart';
+import 'package:flowy_infra_ui/widget/flowy_tooltip.dart';
 import 'package:flowy_infra_ui/widget/ignore_parent_gesture.dart';
 import 'package:flowy_infra_ui/widget/spacing.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:flutter/material.dart';
 class FlowyButton extends StatelessWidget {
   final Widget text;
   final VoidCallback? onTap;
+  final VoidCallback? onSecondaryTap;
   final void Function(bool)? onHover;
   final EdgeInsets? margin;
   final Widget? leftIcon;
@@ -20,11 +22,14 @@ class FlowyButton extends StatelessWidget {
   final bool disable;
   final double disableOpacity;
   final Size? leftIconSize;
+  final bool expandText;
+  final MainAxisAlignment mainAxisAlignment;
 
   const FlowyButton({
     Key? key,
     required this.text,
     this.onTap,
+    this.onSecondaryTap,
     this.onHover,
     this.margin,
     this.leftIcon,
@@ -37,27 +42,32 @@ class FlowyButton extends StatelessWidget {
     this.disable = false,
     this.disableOpacity = 0.5,
     this.leftIconSize = const Size.square(16),
+    this.expandText = true,
+    this.mainAxisAlignment = MainAxisAlignment.center,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    if (!disable) {
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: FlowyHover(
-          style: HoverStyle(
-            borderRadius: radius ?? Corners.s6Border,
-            hoverColor: hoverColor ?? Theme.of(context).colorScheme.secondary,
-          ),
-          onHover: onHover,
-          isSelected: () => isSelected,
-          builder: (context, onHover) => _render(),
+    final color = hoverColor ?? Theme.of(context).colorScheme.secondary;
+    final alpha = (255 * disableOpacity).toInt();
+    color.withAlpha(alpha);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: disable ? null : onTap,
+      onSecondaryTap: disable ? null : onSecondaryTap,
+      child: FlowyHover(
+        cursor:
+            disable ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+        style: HoverStyle(
+          borderRadius: radius ?? Corners.s6Border,
+          hoverColor: color,
         ),
-      );
-    } else {
-      return Opacity(opacity: disableOpacity, child: _render());
-    }
+        onHover: disable ? null : onHover,
+        isSelected: () => isSelected,
+        builder: (context, onHover) => _render(),
+      ),
+    );
   }
 
   Widget _render() {
@@ -73,7 +83,11 @@ class FlowyButton extends StatelessWidget {
       children.add(const HSpace(6));
     }
 
-    children.add(Expanded(child: text));
+    if (expandText) {
+      children.add(Expanded(child: text));
+    } else {
+      children.add(text);
+    }
 
     if (rightIcon != null) {
       children.add(const HSpace(6));
@@ -82,7 +96,7 @@ class FlowyButton extends StatelessWidget {
     }
 
     Widget child = Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: mainAxisAlignment,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: children,
     );
@@ -95,7 +109,7 @@ class FlowyButton extends StatelessWidget {
       decoration: decoration,
       child: Padding(
         padding:
-            margin ?? const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+            margin ?? const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         child: child,
       ),
     );
@@ -121,6 +135,8 @@ class FlowyTextButton extends StatelessWidget {
 
   final TextDecoration? decoration;
 
+  final String? fontFamily;
+
   // final HoverDisplayConfig? hoverDisplay;
   const FlowyTextButton(
     this.text, {
@@ -137,8 +153,9 @@ class FlowyTextButton extends StatelessWidget {
     this.radius,
     this.mainAxisAlignment = MainAxisAlignment.start,
     this.tooltip,
-    this.constraints = const BoxConstraints(minWidth: 58.0, minHeight: 30.0),
+    this.constraints = const BoxConstraints(minWidth: 0.0, minHeight: 0.0),
     this.decoration,
+    this.fontFamily,
   }) : super(key: key);
 
   @override
@@ -157,20 +174,17 @@ class FlowyTextButton extends StatelessWidget {
         color: fontColor,
         textAlign: TextAlign.center,
         decoration: decoration,
+        fontFamily: fontFamily,
       ),
     );
 
-    Widget child = Padding(
-      padding: padding,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: mainAxisAlignment,
-        children: children,
-      ),
+    Widget child = Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisAlignment: mainAxisAlignment,
+      children: children,
     );
 
     child = RawMaterialButton(
-      visualDensity: VisualDensity.compact,
       hoverElevation: 0,
       highlightElevation: 0,
       shape: RoundedRectangleBorder(borderRadius: radius ?? Corners.s6Border),
@@ -182,17 +196,14 @@ class FlowyTextButton extends StatelessWidget {
       highlightColor: Colors.transparent,
       elevation: 0,
       constraints: constraints,
-      onPressed: () {},
-      child: child,
-    );
-
-    child = IgnoreParentGestureWidget(
-      onPress: onPressed,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: padding,
+      onPressed: onPressed,
       child: child,
     );
 
     if (tooltip != null) {
-      child = Tooltip(
+      child = FlowyTooltip(
         message: tooltip!,
         child: child,
       );
@@ -281,7 +292,7 @@ class FlowyRichTextButton extends StatelessWidget {
     );
 
     if (tooltip != null) {
-      child = Tooltip(
+      child = FlowyTooltip(
         message: tooltip!,
         child: child,
       );

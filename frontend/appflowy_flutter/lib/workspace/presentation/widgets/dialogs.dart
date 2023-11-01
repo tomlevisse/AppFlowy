@@ -12,29 +12,40 @@ export 'package:flowy_infra_ui/widget/dialog/styled_dialogs.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 
 class NavigatorTextFieldDialog extends StatefulWidget {
+  const NavigatorTextFieldDialog({
+    super.key,
+    required this.title,
+    this.autoSelectAllText = false,
+    required this.value,
+    required this.confirm,
+    this.cancel,
+  });
+
   final String value;
   final String title;
   final void Function()? cancel;
   final void Function(String) confirm;
-
-  const NavigatorTextFieldDialog({
-    required this.title,
-    required this.value,
-    required this.confirm,
-    this.cancel,
-    Key? key,
-  }) : super(key: key);
+  final bool autoSelectAllText;
 
   @override
-  State<NavigatorTextFieldDialog> createState() => _CreateTextFieldDialog();
+  State<NavigatorTextFieldDialog> createState() =>
+      _NavigatorTextFieldDialogState();
 }
 
-class _CreateTextFieldDialog extends State<NavigatorTextFieldDialog> {
+class _NavigatorTextFieldDialogState extends State<NavigatorTextFieldDialog> {
   String newValue = "";
+  final controller = TextEditingController();
 
   @override
   void initState() {
     newValue = widget.value;
+    controller.text = newValue;
+    if (widget.autoSelectAllText) {
+      controller.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: newValue.length,
+      );
+    }
     super.initState();
   }
 
@@ -52,7 +63,7 @@ class _CreateTextFieldDialog extends State<NavigatorTextFieldDialog> {
           FlowyFormTextInput(
             textAlign: TextAlign.center,
             hintText: LocaleKeys.dialogCreatePageNameHint.tr(),
-            initialValue: widget.value,
+            controller: controller,
             textStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
                   fontSize: FontSizes.s16,
                 ),
@@ -114,10 +125,17 @@ class _CreateFlowyAlertDialog extends State<NavigatorAlertDialog> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
           ...[
-            FlowyText.medium(
-              widget.title,
-              fontSize: FontSizes.s16,
-              color: Theme.of(context).colorScheme.tertiary,
+            ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 400,
+                maxHeight: 260,
+              ),
+              child: FlowyText.medium(
+                widget.title,
+                fontSize: FontSizes.s16,
+                color: Theme.of(context).colorScheme.tertiary,
+                maxLines: null,
+              ),
             ),
           ],
           if (widget.confirm != null) ...[
@@ -205,6 +223,7 @@ class OkCancelButton extends StatelessWidget {
   final String? cancelTitle;
   final double? minHeight;
   final MainAxisAlignment alignment;
+  final TextButtonMode mode;
 
   const OkCancelButton({
     Key? key,
@@ -214,6 +233,7 @@ class OkCancelButton extends StatelessWidget {
     this.cancelTitle,
     this.minHeight,
     this.alignment = MainAxisAlignment.spaceAround,
+    this.mode = TextButtonMode.big,
   }) : super(key: key);
 
   @override
@@ -225,16 +245,16 @@ class OkCancelButton extends StatelessWidget {
         children: <Widget>[
           if (onCancelPressed != null)
             SecondaryTextButton(
-              cancelTitle ?? LocaleKeys.button_Cancel.tr(),
+              cancelTitle ?? LocaleKeys.button_cancel.tr(),
               onPressed: onCancelPressed,
-              bigMode: true,
+              mode: mode,
             ),
           HSpace(Insets.m),
           if (onOkPressed != null)
             PrimaryTextButton(
-              okTitle ?? LocaleKeys.button_OK.tr(),
+              okTitle ?? LocaleKeys.button_ok.tr(),
               onPressed: onOkPressed,
-              bigMode: true,
+              mode: mode,
             ),
         ],
       ),

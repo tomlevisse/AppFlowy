@@ -1,8 +1,11 @@
+import 'package:appflowy/generated/flowy_svgs.g.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pb.dart';
+import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra/theme_extension.dart';
-import 'package:flowy_infra/image.dart';
+
 import 'package:flowy_infra_ui/style_widget/hover.dart';
+import 'package:flowy_infra_ui/widget/flowy_tooltip.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:styled_widget/styled_widget.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -19,8 +22,8 @@ class GridCellAccessoryBuildContext {
   });
 }
 
-class GridCellAccessoryBuilder {
-  final GlobalKey _key = GlobalKey();
+class GridCellAccessoryBuilder<T extends State<StatefulWidget>> {
+  final GlobalKey<T> _key = GlobalKey();
 
   final Widget Function(Key key) _builder;
 
@@ -41,7 +44,7 @@ class GridCellAccessoryBuilder {
   }
 }
 
-abstract class GridCellAccessoryState {
+abstract mixin class GridCellAccessoryState {
   void onTap();
 
   // The accessory will be hidden if enable() return false;
@@ -65,11 +68,18 @@ class _PrimaryCellAccessoryState extends State<PrimaryCellAccessory>
     with GridCellAccessoryState {
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
+    return FlowyTooltip(
       message: LocaleKeys.tooltip_openAsPage.tr(),
-      child: svgWidget(
-        "grid/expander",
-        color: Theme.of(context).colorScheme.primary,
+      child: SizedBox(
+        width: 26,
+        height: 26,
+        child: Padding(
+          padding: const EdgeInsets.all(3.0),
+          child: FlowySvg(
+            FlowySvgs.full_view_s,
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
       ),
     );
   }
@@ -83,50 +93,36 @@ class _PrimaryCellAccessoryState extends State<PrimaryCellAccessory>
 
 class AccessoryHover extends StatefulWidget {
   final CellAccessory child;
-  final EdgeInsets contentPadding;
+  final FieldType fieldType;
   const AccessoryHover({
+    super.key,
     required this.child,
-    this.contentPadding = EdgeInsets.zero,
-    Key? key,
-  }) : super(key: key);
+    required this.fieldType,
+  });
 
   @override
   State<AccessoryHover> createState() => _AccessoryHoverState();
 }
 
 class _AccessoryHoverState extends State<AccessoryHover> {
-  late AccessoryHoverState _hoverState;
-  VoidCallback? _listenerFn;
-
-  @override
-  void initState() {
-    _hoverState = AccessoryHoverState();
-    _listenerFn = () =>
-        _hoverState.onHover = widget.child.onAccessoryHover?.value ?? false;
-    widget.child.onAccessoryHover?.addListener(_listenerFn!);
-
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    _hoverState.dispose();
-
-    if (_listenerFn != null) {
-      widget.child.onAccessoryHover?.removeListener(_listenerFn!);
-      _listenerFn = null;
-    }
-    super.dispose();
-  }
+  bool _isHover = false;
 
   @override
   Widget build(BuildContext context) {
-    List<Widget> children = [
-      Padding(padding: widget.contentPadding, child: widget.child),
+    final List<Widget> children = [
+      DecoratedBox(
+        decoration: BoxDecoration(
+          color: _isHover && widget.fieldType != FieldType.Checklist
+              ? AFThemeExtension.of(context).lightGreyHover
+              : Colors.transparent,
+          borderRadius: Corners.s6Border,
+        ),
+        child: widget.child,
+      ),
     ];
 
     final accessoryBuilder = widget.child.accessoryBuilder;
-    if (accessoryBuilder != null) {
+    if (accessoryBuilder != null && _isHover) {
       final accessories = accessoryBuilder(
         (GridCellAccessoryBuildContext(
           anchorContext: context,
@@ -141,34 +137,18 @@ class _AccessoryHoverState extends State<AccessoryHover> {
       );
     }
 
-    return ChangeNotifierProvider.value(
-      value: _hoverState,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        opaque: false,
-        onEnter: (p) => setState(() => _hoverState.onHover = true),
-        onExit: (p) => setState(() => _hoverState.onHover = false),
-        child: Stack(
-          fit: StackFit.loose,
-          alignment: AlignmentDirectional.center,
-          children: children,
-        ),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      opaque: false,
+      onEnter: (p) => setState(() => _isHover = true),
+      onExit: (p) => setState(() => _isHover = false),
+      child: Stack(
+        fit: StackFit.loose,
+        alignment: AlignmentDirectional.center,
+        children: children,
       ),
     );
   }
-}
-
-class AccessoryHoverState extends ChangeNotifier {
-  bool _onHover = false;
-
-  set onHover(bool value) {
-    if (_onHover != value) {
-      _onHover = value;
-      notifyListeners();
-    }
-  }
-
-  bool get onHover => _onHover;
 }
 
 class CellAccessoryContainer extends StatelessWidget {
@@ -183,12 +163,7 @@ class CellAccessoryContainer extends StatelessWidget {
       final hover = FlowyHover(
         style:
             HoverStyle(hoverColor: AFThemeExtension.of(context).lightGreyHover),
-        builder: (_, onHover) => Container(
-          width: 26,
-          height: 26,
-          padding: const EdgeInsets.all(3),
-          child: accessory.build(),
-        ),
+        builder: (_, onHover) => accessory.build(),
       );
       return GestureDetector(
         behavior: HitTestBehavior.opaque,

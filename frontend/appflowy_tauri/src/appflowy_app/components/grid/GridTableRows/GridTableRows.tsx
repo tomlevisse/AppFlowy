@@ -1,25 +1,50 @@
-import { GridTableItem } from './GridTableItem';
-import { useGridTableRowsHooks } from './GridTableRows.hooks';
+import { DatabaseController } from '@/appflowy_app/stores/effects/database/database_controller';
+import { RowInfo } from '@/appflowy_app/stores/effects/database/row/row_cache';
+import { GridTableRow } from './GridTableRow';
+import { DragDropContext, Droppable, DroppableProvided, OnDragEndResponder } from 'react-beautiful-dnd';
 
-export const GridTableRows = () => {
-  const { rows } = useGridTableRowsHooks();
+export const GridTableRows = ({
+  viewId,
+  controller,
+  allRows,
+  onOpenRow,
+}: {
+  viewId: string;
+  controller: DatabaseController;
+  allRows: readonly RowInfo[];
+  onOpenRow: (rowId: RowInfo) => void;
+}) => {
+  const onRowsDragEnd: OnDragEndResponder = async (result) => {
+    if (!result.destination) return;
+    if (result.destination.index === result.source.index) return;
+    await controller.moveRow(result.draggableId, allRows[result.destination.index].row.id);
+  };
+
   return (
-    <tbody>
-      {rows.map((row, i) => {
-        return (
-          <tr key={row.rowId}>
-            {row.values.map((value) => {
+    <DragDropContext onDragEnd={onRowsDragEnd}>
+      <Droppable droppableId='table'>
+        {(droppableProvided: DroppableProvided) => (
+          <div
+            className={'absolute h-full overflow-y-auto overflow-x-hidden'}
+            ref={droppableProvided.innerRef}
+            {...droppableProvided.droppableProps}
+          >
+            {allRows.map((row, i) => {
               return (
-                <td key={value.fieldId} className='m-0 border border-l-0 border-shade-6 p-0'>
-                  <GridTableItem rowItem={value} rowId={row.rowId} />
-                </td>
+                <GridTableRow
+                  onOpenRow={onOpenRow}
+                  row={row}
+                  key={i}
+                  index={i}
+                  viewId={viewId}
+                  controller={controller}
+                />
               );
             })}
-
-            <td className='m-0 border border-r-0 border-shade-6 p-0'></td>
-          </tr>
-        );
-      })}
-    </tbody>
+            {droppableProvided.placeholder}
+          </div>
+        )}
+      </Droppable>
+    </DragDropContext>
   );
 };

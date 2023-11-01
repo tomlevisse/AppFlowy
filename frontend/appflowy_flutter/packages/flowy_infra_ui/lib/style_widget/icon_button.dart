@@ -1,8 +1,7 @@
-import 'dart:math';
-
-import 'package:flowy_infra/image.dart';
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra_ui/style_widget/hover.dart';
+import 'package:flowy_infra_ui/widget/flowy_tooltip.dart';
+import 'package:flowy_svg/flowy_svg.dart';
 import 'package:flutter/material.dart';
 
 class FlowyIconButton extends StatelessWidget {
@@ -16,7 +15,10 @@ class FlowyIconButton extends StatelessWidget {
   final EdgeInsets iconPadding;
   final BorderRadius? radius;
   final String? tooltipText;
+  final InlineSpan? richTooltipText;
   final bool preferBelow;
+  final BoxDecoration? decoration;
+  final bool? isSelected;
 
   const FlowyIconButton({
     Key? key,
@@ -28,29 +30,38 @@ class FlowyIconButton extends StatelessWidget {
     this.iconColorOnHover,
     this.iconPadding = EdgeInsets.zero,
     this.radius,
+    this.decoration,
     this.tooltipText,
+    this.richTooltipText,
     this.preferBelow = true,
+    this.isSelected,
     required this.icon,
-  }) : super(key: key);
+  })  : assert((richTooltipText != null && tooltipText == null) ||
+            (richTooltipText == null && tooltipText != null) ||
+            (richTooltipText == null && tooltipText == null)),
+        super(key: key);
 
   @override
   Widget build(BuildContext context) {
     Widget child = icon;
     final size = Size(width, height ?? width);
 
+    final tooltipMessage =
+        tooltipText == null && richTooltipText == null ? '' : tooltipText;
+
     assert(size.width > iconPadding.horizontal);
     assert(size.height > iconPadding.vertical);
 
-    final childWidth = min(size.width - iconPadding.horizontal,
-        size.height - iconPadding.vertical);
-    final childSize = Size(childWidth, childWidth);
-
-    return ConstrainedBox(
-      constraints:
-          BoxConstraints.tightFor(width: size.width, height: size.height),
-      child: Tooltip(
+    return Container(
+      constraints: BoxConstraints.tightFor(
+        width: size.width,
+        height: size.height,
+      ),
+      decoration: decoration,
+      child: FlowyTooltip(
         preferBelow: preferBelow,
-        message: tooltipText ?? '',
+        message: tooltipMessage,
+        richMessage: richTooltipText,
         showDuration: Duration.zero,
         child: RawMaterialButton(
           visualDensity: VisualDensity.compact,
@@ -59,22 +70,26 @@ class FlowyIconButton extends StatelessWidget {
           shape:
               RoundedRectangleBorder(borderRadius: radius ?? Corners.s6Border),
           fillColor: fillColor,
-          hoverColor: hoverColor ?? Theme.of(context).colorScheme.secondary,
+          hoverColor: hoverColor,
           focusColor: Colors.transparent,
           splashColor: Colors.transparent,
           highlightColor: Colors.transparent,
           elevation: 0,
           onPressed: onPressed,
           child: FlowyHover(
+            isSelected: isSelected != null ? () => isSelected! : null,
             style: HoverStyle(
+              // hoverColor is set in both [HoverStyle] and [RawMaterialButton] to avoid the conflicts between two layers
               hoverColor: hoverColor,
               foregroundColorOnHover:
                   iconColorOnHover ?? Theme.of(context).iconTheme.color,
-              backgroundColor: fillColor ?? Colors.transparent,
+              //Do not set background here. Use [fillColor] instead.
             ),
             child: Padding(
               padding: iconPadding,
-              child: SizedBox.fromSize(size: childSize, child: child),
+              child: Center(
+                child: child,
+              ),
             ),
           ),
         ),
@@ -95,7 +110,7 @@ class FlowyDropdownButton extends StatelessWidget {
     return FlowyIconButton(
       width: 16,
       onPressed: onPressed,
-      icon: svgWidget("home/drop_down_show"),
+      icon: const FlowySvg(FlowySvgData("home/drop_down_show")),
     );
   }
 }

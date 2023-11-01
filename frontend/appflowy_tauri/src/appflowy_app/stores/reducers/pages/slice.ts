@@ -1,37 +1,116 @@
+import { ViewIconTypePB, ViewLayoutPB, ViewPB } from '@/services/backend';
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { ViewLayoutTypePB } from '@/services/backend';
 
-export interface IPage {
+export interface Page {
   id: string;
-  title: string;
-  pageType: ViewLayoutTypePB;
-  folderId: string;
+  parentId: string;
+  name: string;
+  layout: ViewLayoutPB;
+  icon?: PageIcon;
 }
 
-const initialState: IPage[] = [];
+export interface PageIcon {
+  ty: ViewIconTypePB;
+  value: string;
+}
+
+export function parserViewPBToPage(view: ViewPB): Page {
+  const icon = view.icon;
+
+  return {
+    id: view.id,
+    name: view.name,
+    parentId: view.parent_view_id,
+    layout: view.layout,
+    icon: icon
+      ? {
+          ty: icon.ty,
+          value: icon.value,
+        }
+      : undefined,
+  };
+}
+
+export interface PageState {
+  pageMap: Record<string, Page>;
+  relationMap: Record<string, string[] | undefined>;
+  expandedIdMap: Record<string, boolean>;
+}
+
+export const initialState: PageState = {
+  pageMap: {},
+  relationMap: {},
+  expandedIdMap: getExpandedPageIds().reduce((acc, id) => {
+    acc[id] = true;
+    return acc;
+  }, {} as Record<string, boolean>),
+};
 
 export const pagesSlice = createSlice({
   name: 'pages',
-  initialState: initialState,
+  initialState,
   reducers: {
-    didReceivePages(state, action: PayloadAction<IPage[]>) {
-      return action.payload;
+    addChildPages(
+      state,
+      action: PayloadAction<{
+        childPages: Page[];
+        id: string;
+      }>
+    ) {
+      const { childPages, id } = action.payload;
+      const pageMap: Record<string, Page> = {};
+
+      const children: string[] = [];
+
+      childPages.forEach((page) => {
+        pageMap[page.id] = page;
+        children.push(page.id);
+      });
+
+      state.pageMap = {
+        ...state.pageMap,
+        ...pageMap,
+      };
+      state.relationMap[id] = children;
     },
-    addPage(state, action: PayloadAction<IPage>) {
-      state.push(action.payload);
+
+    onPageChanged(state, action: PayloadAction<Page>) {
+      const page = action.payload;
+
+      state.pageMap[page.id] = page;
     },
-    renamePage(state, action: PayloadAction<{ id: string; newTitle: string }>) {
-      return state.map<IPage>((page: IPage) =>
-        page.id === action.payload.id ? { ...page, title: action.payload.newTitle } : page
-      );
+
+    removeChildPages(state, action: PayloadAction<string>) {
+      const parentId = action.payload;
+
+      delete state.relationMap[parentId];
     },
-    deletePage(state, action: PayloadAction<{ id: string }>) {
-      return state.filter((page) => page.id !== action.payload.id);
+
+    expandPage(state, action: PayloadAction<string>) {
+      const id = action.payload;
+      state.expandedIdMap[id] = true;
+      const ids = Object.keys(state.expandedIdMap).filter(id => state.expandedIdMap[id]);
+      storeExpandedPageIds(ids);
     },
-    clearPages() {
-      return [];
+
+    collapsePage(state, action: PayloadAction<string>) {
+      const id = action.payload;
+
+      state.expandedIdMap[id] = false;
+      const ids = Object.keys(state.expandedIdMap).filter(id => state.expandedIdMap[id]);
+      storeExpandedPageIds(ids);
     },
   },
 });
 
 export const pagesActions = pagesSlice.actions;
+
+function storeExpandedPageIds(expandedPageIds: string[]) {
+  localStorage.setItem('expandedPageIds', JSON.stringify(expandedPageIds));
+}
+
+function getExpandedPageIds(): string[] {
+  const expandedPageIds = localStorage.getItem('expandedPageIds');
+
+  return expandedPageIds ? JSON.parse(expandedPageIds) : [];
+}

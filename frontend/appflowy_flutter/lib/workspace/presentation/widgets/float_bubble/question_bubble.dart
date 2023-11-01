@@ -1,3 +1,4 @@
+import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/startup/tasks/rust_sdk.dart';
 import 'package:appflowy/workspace/presentation/home/toast.dart';
 import 'package:appflowy/workspace/presentation/widgets/pop_up_action.dart';
@@ -28,8 +29,29 @@ class QuestionBubble extends StatelessWidget {
   }
 }
 
-class BubbleActionList extends StatelessWidget {
+class BubbleActionList extends StatefulWidget {
   const BubbleActionList({Key? key}) : super(key: key);
+
+  @override
+  State<BubbleActionList> createState() => _BubbleActionListState();
+}
+
+class _BubbleActionListState extends State<BubbleActionList> {
+  bool isOpen = false;
+
+  Color get fontColor => isOpen
+      ? Theme.of(context).colorScheme.onPrimary
+      : Theme.of(context).colorScheme.tertiary;
+
+  Color get fillColor => isOpen
+      ? Theme.of(context).colorScheme.primary
+      : Theme.of(context).colorScheme.tertiaryContainer;
+
+  void toggle() {
+    setState(() {
+      isOpen = !isOpen;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,19 +70,23 @@ class BubbleActionList extends StatelessWidget {
           '?',
           tooltip: LocaleKeys.questionBubble_help.tr(),
           fontWeight: FontWeight.w600,
-          fontColor: Theme.of(context).colorScheme.tertiary,
-          fillColor: Theme.of(context).colorScheme.tertiaryContainer,
-          hoverColor: Theme.of(context).colorScheme.tertiaryContainer,
+          fontColor: fontColor,
+          fillColor: fillColor,
+          hoverColor: Theme.of(context).colorScheme.primary,
           mainAxisAlignment: MainAxisAlignment.center,
           radius: Corners.s10Border,
-          onPressed: () => controller.show(),
+          onPressed: () {
+            toggle();
+            controller.show();
+          },
         );
       },
+      onClosed: toggle,
       onSelected: (action, controller) {
         if (action is BubbleActionWrapper) {
           switch (action.inner) {
             case BubbleAction.whatsNews:
-              _launchURL("https://www.appflowy.io/whatsnew");
+              _launchURL("https://www.appflowy.io/what-is-new");
               break;
             case BubbleAction.help:
               _launchURL("https://discord.gg/9Q2xaN37tV");
@@ -76,6 +102,11 @@ class BubbleActionList extends StatelessWidget {
             case BubbleAction.markdown:
               _launchURL(
                 "https://appflowy.gitbook.io/docs/essential-documentation/markdown",
+              );
+              break;
+            case BubbleAction.github:
+              _launchURL(
+                'https://github.com/AppFlowy-IO/AppFlowy/issues/new/choose',
               );
               break;
           }
@@ -108,19 +139,14 @@ class _DebugToast {
 
   Future<String> _getDeviceInfo() async {
     final deviceInfoPlugin = DeviceInfoPlugin();
-    final deviceInfo = deviceInfoPlugin.deviceInfo;
+    final deviceInfo = await deviceInfoPlugin.deviceInfo;
 
-    return deviceInfo.then((info) {
-      var debugText = "";
-      info.toMap().forEach((key, value) {
-        debugText = "$debugText$key: $value\n";
-      });
-      return debugText;
-    });
+    return deviceInfo.data.entries
+        .fold('', (prev, el) => "$prev${el.key}: ${el.value}\n");
   }
 
   Future<String> _getDocumentPath() async {
-    return appFlowyDocumentDirectory().then((directory) {
+    return appFlowyApplicationDataDirectory().then((directory) {
       final path = directory.path.toString();
       return "Document: $path\n";
     });
@@ -141,9 +167,9 @@ class FlowyVersionDescription extends CustomActionCell {
             );
           }
 
-          PackageInfo packageInfo = snapshot.data;
-          String appName = packageInfo.appName;
-          String version = packageInfo.version;
+          final PackageInfo packageInfo = snapshot.data;
+          final String appName = packageInfo.appName;
+          final String version = packageInfo.version;
 
           return SizedBox(
             height: 30,
@@ -174,14 +200,14 @@ class FlowyVersionDescription extends CustomActionCell {
   }
 }
 
-enum BubbleAction { whatsNews, help, debug, shortcuts, markdown }
+enum BubbleAction { whatsNews, help, debug, shortcuts, markdown, github }
 
 class BubbleActionWrapper extends ActionCell {
   final BubbleAction inner;
 
   BubbleActionWrapper(this.inner);
   @override
-  Widget? leftIcon(Color iconColor) => FlowyText.regular(inner.emoji);
+  Widget? leftIcon(Color iconColor) => inner.emoji;
 
   @override
   String get name => inner.name;
@@ -200,21 +226,31 @@ extension QuestionBubbleExtension on BubbleAction {
         return LocaleKeys.questionBubble_shortcuts.tr();
       case BubbleAction.markdown:
         return LocaleKeys.questionBubble_markdown.tr();
+      case BubbleAction.github:
+        return LocaleKeys.questionBubble_feedback.tr();
     }
   }
 
-  String get emoji {
+  Widget get emoji {
     switch (this) {
       case BubbleAction.whatsNews:
-        return '🆕';
+        return const FlowyText.regular('🆕');
       case BubbleAction.help:
-        return '👥';
+        return const FlowyText.regular('👥');
       case BubbleAction.debug:
-        return '🐛';
+        return const FlowyText.regular('🐛');
       case BubbleAction.shortcuts:
-        return '📋';
+        return const FlowyText.regular('📋');
       case BubbleAction.markdown:
-        return '✨';
+        return const FlowyText.regular('✨');
+      case BubbleAction.github:
+        return const Padding(
+          padding: EdgeInsets.all(3.0),
+          child: FlowySvg(
+            FlowySvgs.archive_m,
+            size: Size.square(12),
+          ),
+        );
     }
   }
 }

@@ -1,9 +1,10 @@
+import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/plugins/database_view/application/field/type_option/select_option_type_option_bloc.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/select_option.pb.dart';
 import 'package:appflowy_popover/appflowy_popover.dart';
-import 'package:flowy_infra/image.dart';
+
 import 'package:flowy_infra/theme_extension.dart';
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/select_type_option.pb.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -30,7 +31,7 @@ class SelectOptionTypeOptionWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
+    return BlocProvider<SelectOptionTypeOptionBloc>(
       create: (context) => SelectOptionTypeOptionBloc(
         options: options,
         typeOptionAction: typeOptionAction,
@@ -38,11 +39,11 @@ class SelectOptionTypeOptionWidget extends StatelessWidget {
       child:
           BlocBuilder<SelectOptionTypeOptionBloc, SelectOptionTypeOptionState>(
         builder: (context, state) {
-          List<Widget> children = [
+          final List<Widget> children = [
             const TypeOptionSeparator(),
             const OptionTitle(),
             if (state.isEditingOption)
-              _CreateOptionTextField(popoverMutex: popoverMutex),
+              CreateOptionTextField(popoverMutex: popoverMutex),
             if (state.options.isNotEmpty && state.isEditingOption)
               const VSpace(10),
             if (state.options.isEmpty && !state.isEditingOption)
@@ -70,7 +71,7 @@ class OptionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<SelectOptionTypeOptionBloc, SelectOptionTypeOptionState>(
       builder: (context, state) {
-        List<Widget> children = [
+        final List<Widget> children = [
           Padding(
             padding: const EdgeInsets.only(left: 9),
             child: FlowyText.medium(
@@ -195,8 +196,8 @@ class _OptionCellState extends State<_OptionCell> {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 6.0),
-            child: svgWidget(
-              "grid/details",
+            child: FlowySvg(
+              FlowySvgs.details_s,
               color: Theme.of(context).iconTheme.color,
             ),
           ),
@@ -209,7 +210,7 @@ class _OptionCellState extends State<_OptionCell> {
       offset: const Offset(8, 0),
       margin: EdgeInsets.zero,
       asBarrier: true,
-      constraints: BoxConstraints.loose(const Size(460, 460)),
+      constraints: BoxConstraints.loose(const Size(460, 470)),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12.0),
         child: child,
@@ -256,8 +257,8 @@ class _AddOptionButton extends StatelessWidget {
                 .read<SelectOptionTypeOptionBloc>()
                 .add(const SelectOptionTypeOptionEvent.addingOption());
           },
-          leftIcon: svgWidget(
-            "home/add",
+          leftIcon: FlowySvg(
+            FlowySvgs.add_s,
             color: Theme.of(context).iconTheme.color,
           ),
         ),
@@ -266,18 +267,18 @@ class _AddOptionButton extends StatelessWidget {
   }
 }
 
-class _CreateOptionTextField extends StatefulWidget {
+class CreateOptionTextField extends StatefulWidget {
   final PopoverMutex? popoverMutex;
-  const _CreateOptionTextField({
+  const CreateOptionTextField({
     Key? key,
     this.popoverMutex,
   }) : super(key: key);
 
   @override
-  State<_CreateOptionTextField> createState() => _CreateOptionTextFieldState();
+  State<CreateOptionTextField> createState() => _CreateOptionTextFieldState();
 }
 
-class _CreateOptionTextFieldState extends State<_CreateOptionTextField> {
+class _CreateOptionTextFieldState extends State<CreateOptionTextField> {
   late final FocusNode _focusNode;
 
   @override
@@ -305,7 +306,6 @@ class _CreateOptionTextFieldState extends State<_CreateOptionTextField> {
           padding: const EdgeInsets.symmetric(horizontal: 12.0),
           child: FlowyTextField(
             autoClearWhenDone: true,
-            maxLength: 30,
             text: text,
             focusNode: _focusNode,
             onCanceled: () {
@@ -323,5 +323,16 @@ class _CreateOptionTextFieldState extends State<_CreateOptionTextField> {
         );
       },
     );
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(() {
+      if (_focusNode.hasFocus) {
+        widget.popoverMutex?.close();
+      }
+    });
+    _focusNode.dispose();
+    super.dispose();
   }
 }

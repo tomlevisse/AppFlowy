@@ -1,13 +1,14 @@
 import 'dart:io';
 
+import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/generated/locale_keys.g.dart';
 import 'package:appflowy/workspace/application/home/home_setting_bloc.dart';
 import 'package:appflowy/workspace/presentation/home/home_stack.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flowy_infra/image.dart';
 import 'package:flowy_infra/size.dart';
 import 'package:flowy_infra_ui/style_widget/icon_button.dart';
 import 'package:flowy_infra_ui/style_widget/text.dart';
+import 'package:flowy_infra_ui/widget/flowy_tooltip.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
@@ -19,14 +20,9 @@ class NavigationNotifier with ChangeNotifier {
   List<NavigationItem> navigationItems;
   NavigationNotifier({required this.navigationItems});
 
-  void update(HomeStackNotifier notifier) {
-    bool shouldNotify = false;
-    if (navigationItems != notifier.plugin.display.navigationItems) {
-      navigationItems = notifier.plugin.display.navigationItems;
-      shouldNotify = true;
-    }
-
-    if (shouldNotify) {
+  void update(PageNotifier notifier) {
+    if (navigationItems != notifier.plugin.widgetBuilder.navigationItems) {
+      navigationItems = notifier.plugin.widgetBuilder.navigationItems;
       notifyListeners();
     }
   }
@@ -37,11 +33,11 @@ class FlowyNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProxyProvider<HomeStackNotifier, NavigationNotifier>(
+    return ChangeNotifierProxyProvider<PageNotifier, NavigationNotifier>(
       create: (_) {
-        final notifier = Provider.of<HomeStackNotifier>(context, listen: false);
+        final notifier = Provider.of<PageNotifier>(context, listen: false);
         return NavigationNotifier(
-          navigationItems: notifier.plugin.display.navigationItems,
+          navigationItems: notifier.plugin.widgetBuilder.navigationItems,
         );
       },
       update: (_, notifier, controller) => controller!..update(notifier),
@@ -54,7 +50,6 @@ class FlowyNavigation extends StatelessWidget {
               builder: (ctx, items, child) => Expanded(
                 child: Row(
                   children: _renderNavigationItems(items),
-                  // crossAxisAlignment: WrapCrossAlignment.start,
                 ),
               ),
             ),
@@ -71,7 +66,7 @@ class FlowyNavigation extends StatelessWidget {
         if (state.isMenuCollapsed) {
           return RotationTransition(
             turns: const AlwaysStoppedAnimation(180 / 360),
-            child: Tooltip(
+            child: FlowyTooltip(
               richMessage: sidebarTooltipTextSpan(
                 context,
                 LocaleKeys.sideBar_openSidebar.tr(),
@@ -85,8 +80,8 @@ class FlowyNavigation extends StatelessWidget {
                       .add(const HomeSettingEvent.collapseMenu());
                 },
                 iconPadding: const EdgeInsets.fromLTRB(2, 2, 2, 2),
-                icon: svgWidget(
-                  "home/hide_menu",
+                icon: FlowySvg(
+                  FlowySvgs.hide_menu_m,
                   color: Theme.of(context).iconTheme.color,
                 ),
               ),
@@ -104,10 +99,10 @@ class FlowyNavigation extends StatelessWidget {
       return [];
     }
 
-    List<NavigationItem> newItems = _filter(items);
-    Widget last = NaviItemWidget(newItems.removeLast());
+    final List<NavigationItem> newItems = _filter(items);
+    final Widget last = NaviItemWidget(newItems.removeLast());
 
-    List<Widget> widgets = List.empty(growable: true);
+    final List<Widget> widgets = List.empty(growable: true);
     // widgets.addAll(newItems.map((item) => NaviItemDivider(child: NaviItemWidget(item))).toList());
 
     for (final item in newItems) {
@@ -151,7 +146,7 @@ class NaviItemWidget extends StatelessWidget {
 
 class NaviItemDivider extends StatelessWidget {
   final Widget child;
-  const NaviItemDivider({Key? key, required this.child}) : super(key: key);
+  const NaviItemDivider({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -172,6 +167,9 @@ class EllipsisNaviItem extends NavigationItem {
         '...',
         fontSize: FontSizes.s16,
       );
+
+  @override
+  Widget tabBarItem(String pluginId) => leftBarItem;
 
   @override
   NavigationCallback get action => (id) {};

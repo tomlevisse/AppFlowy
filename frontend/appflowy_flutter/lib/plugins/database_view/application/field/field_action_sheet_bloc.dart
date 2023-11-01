@@ -1,5 +1,7 @@
+import 'package:appflowy/plugins/database_view/application/field_settings/field_settings_service.dart';
 import 'package:appflowy_backend/log.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/field_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/field_entities.pb.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/field_settings_entities.pb.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'field_service.dart';
@@ -8,16 +10,21 @@ part 'field_action_sheet_bloc.freezed.dart';
 
 class FieldActionSheetBloc
     extends Bloc<FieldActionSheetEvent, FieldActionSheetState> {
+  final String fieldId;
   final FieldBackendService fieldService;
+  final FieldSettingsBackendService fieldSettingsService;
 
-  FieldActionSheetBloc({required FieldCellContext fieldCellContext})
-      : fieldService = FieldBackendService(
+  FieldActionSheetBloc({required FieldContext fieldCellContext})
+      : fieldId = fieldCellContext.fieldInfo.id,
+        fieldService = FieldBackendService(
           viewId: fieldCellContext.viewId,
-          fieldId: fieldCellContext.field.id,
+          fieldId: fieldCellContext.fieldInfo.id,
         ),
+        fieldSettingsService =
+            FieldSettingsBackendService(viewId: fieldCellContext.viewId),
         super(
           FieldActionSheetState.initial(
-            TypeOptionPB.create()..field_2 = fieldCellContext.field,
+            TypeOptionPB.create()..field_2 = fieldCellContext.fieldInfo.field,
           ),
         ) {
     on<FieldActionSheetEvent>(
@@ -31,14 +38,20 @@ class FieldActionSheetBloc
             );
           },
           hideField: (_HideField value) async {
-            final result = await fieldService.updateField(visibility: false);
+            final result = await fieldSettingsService.updateFieldSettings(
+              fieldId: fieldId,
+              fieldVisibility: FieldVisibility.AlwaysHidden,
+            );
             result.fold(
               (l) => null,
               (err) => Log.error(err),
             );
           },
           showField: (_ShowField value) async {
-            final result = await fieldService.updateField(visibility: true);
+            final result = await fieldSettingsService.updateFieldSettings(
+              fieldId: fieldId,
+              fieldVisibility: FieldVisibility.AlwaysShown,
+            );
             result.fold(
               (l) => null,
               (err) => Log.error(err),

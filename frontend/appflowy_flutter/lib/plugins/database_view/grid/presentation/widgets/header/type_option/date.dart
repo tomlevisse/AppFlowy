@@ -1,10 +1,11 @@
+import 'package:appflowy/generated/flowy_svgs.g.dart';
 import 'package:appflowy/plugins/database_view/application/field/type_option/date_bloc.dart';
 import 'package:appflowy/plugins/database_view/application/field/type_option/type_option_context.dart';
+import 'package:appflowy_backend/protobuf/flowy-database2/date_entities.pbenum.dart';
 import 'package:easy_localization/easy_localization.dart' hide DateFormat;
 import 'package:appflowy/generated/locale_keys.g.dart';
-import 'package:flowy_infra/image.dart';
+
 import 'package:flowy_infra_ui/flowy_infra_ui.dart';
-import 'package:appflowy_backend/protobuf/flowy-database/date_type_option_entities.pb.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:appflowy_popover/appflowy_popover.dart';
@@ -72,7 +73,10 @@ class DateTypeOptionWidget extends TypeOptionWidget {
     );
   }
 
-  Widget _renderDateFormatButton(BuildContext context, DateFormat dataFormat) {
+  Widget _renderDateFormatButton(
+    BuildContext context,
+    DateFormatPB dataFormat,
+  ) {
     return AppFlowyPopover(
       mutex: popoverMutex,
       asBarrier: true,
@@ -90,16 +94,17 @@ class DateTypeOptionWidget extends TypeOptionWidget {
           },
         );
       },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0),
-        child: DateFormatButton(
-          buttonMargins: GridSize.typeOptionContentInsets,
-        ),
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 12.0),
+        child: DateFormatButton(),
       ),
     );
   }
 
-  Widget _renderTimeFormatButton(BuildContext context, TimeFormat timeFormat) {
+  Widget _renderTimeFormatButton(
+    BuildContext context,
+    TimeFormatPB timeFormat,
+  ) {
     return AppFlowyPopover(
       mutex: popoverMutex,
       asBarrier: true,
@@ -119,10 +124,7 @@ class DateTypeOptionWidget extends TypeOptionWidget {
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12.0),
-        child: TimeFormatButton(
-          timeFormat: timeFormat,
-          buttonMargins: GridSize.typeOptionContentInsets,
-        ),
+        child: TimeFormatButton(timeFormat: timeFormat),
       ),
     );
   }
@@ -131,11 +133,9 @@ class DateTypeOptionWidget extends TypeOptionWidget {
 class DateFormatButton extends StatelessWidget {
   final VoidCallback? onTap;
   final void Function(bool)? onHover;
-  final EdgeInsets? buttonMargins;
   const DateFormatButton({
     this.onTap,
     this.onHover,
-    this.buttonMargins,
     Key? key,
   }) : super(key: key);
 
@@ -145,25 +145,22 @@ class DateFormatButton extends StatelessWidget {
       height: GridSize.popoverItemHeight,
       child: FlowyButton(
         text: FlowyText.medium(LocaleKeys.grid_field_dateFormat.tr()),
-        margin: buttonMargins,
         onTap: onTap,
         onHover: onHover,
-        rightIcon: const FlowySvg(name: 'grid/more'),
+        rightIcon: const FlowySvg(FlowySvgs.more_s),
       ),
     );
   }
 }
 
 class TimeFormatButton extends StatelessWidget {
-  final TimeFormat timeFormat;
+  final TimeFormatPB timeFormat;
   final VoidCallback? onTap;
   final void Function(bool)? onHover;
-  final EdgeInsets? buttonMargins;
   const TimeFormatButton({
     required this.timeFormat,
     this.onTap,
     this.onHover,
-    this.buttonMargins,
     Key? key,
   }) : super(key: key);
 
@@ -173,18 +170,17 @@ class TimeFormatButton extends StatelessWidget {
       height: GridSize.popoverItemHeight,
       child: FlowyButton(
         text: FlowyText.medium(LocaleKeys.grid_field_timeFormat.tr()),
-        margin: buttonMargins,
         onTap: onTap,
         onHover: onHover,
-        rightIcon: const FlowySvg(name: 'grid/more'),
+        rightIcon: const FlowySvg(FlowySvgs.more_s),
       ),
     );
   }
 }
 
 class DateFormatList extends StatelessWidget {
-  final DateFormat selectedFormat;
-  final Function(DateFormat format) onSelected;
+  final DateFormatPB selectedFormat;
+  final Function(DateFormatPB format) onSelected;
   const DateFormatList({
     required this.selectedFormat,
     required this.onSelected,
@@ -193,7 +189,7 @@ class DateFormatList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cells = DateFormat.values.map((format) {
+    final cells = DateFormatPB.values.map((format) {
       return DateFormatCell(
         dateFormat: format,
         onSelected: onSelected,
@@ -220,8 +216,8 @@ class DateFormatList extends StatelessWidget {
 
 class DateFormatCell extends StatelessWidget {
   final bool isSelected;
-  final DateFormat dateFormat;
-  final Function(DateFormat format) onSelected;
+  final DateFormatPB dateFormat;
+  final Function(DateFormatPB format) onSelected;
   const DateFormatCell({
     required this.dateFormat,
     required this.onSelected,
@@ -233,7 +229,7 @@ class DateFormatCell extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget? checkmark;
     if (isSelected) {
-      checkmark = const FlowySvg(name: 'grid/checkmark');
+      checkmark = const FlowySvg(FlowySvgs.check_s);
     }
 
     return SizedBox(
@@ -247,18 +243,18 @@ class DateFormatCell extends StatelessWidget {
   }
 }
 
-extension DateFormatExtension on DateFormat {
+extension DateFormatExtension on DateFormatPB {
   String title() {
     switch (this) {
-      case DateFormat.Friendly:
+      case DateFormatPB.Friendly:
         return LocaleKeys.grid_field_dateFormatFriendly.tr();
-      case DateFormat.ISO:
+      case DateFormatPB.ISO:
         return LocaleKeys.grid_field_dateFormatISO.tr();
-      case DateFormat.Local:
+      case DateFormatPB.Local:
         return LocaleKeys.grid_field_dateFormatLocal.tr();
-      case DateFormat.US:
+      case DateFormatPB.US:
         return LocaleKeys.grid_field_dateFormatUS.tr();
-      case DateFormat.DayMonthYear:
+      case DateFormatPB.DayMonthYear:
         return LocaleKeys.grid_field_dateFormatDayMonthYear.tr();
       default:
         throw UnimplementedError;
@@ -267,8 +263,8 @@ extension DateFormatExtension on DateFormat {
 }
 
 class TimeFormatList extends StatelessWidget {
-  final TimeFormat selectedFormat;
-  final Function(TimeFormat format) onSelected;
+  final TimeFormatPB selectedFormat;
+  final Function(TimeFormatPB format) onSelected;
   const TimeFormatList({
     required this.selectedFormat,
     required this.onSelected,
@@ -277,7 +273,7 @@ class TimeFormatList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cells = TimeFormat.values.map((format) {
+    final cells = TimeFormatPB.values.map((format) {
       return TimeFormatCell(
         isSelected: format == selectedFormat,
         timeFormat: format,
@@ -303,9 +299,9 @@ class TimeFormatList extends StatelessWidget {
 }
 
 class TimeFormatCell extends StatelessWidget {
-  final TimeFormat timeFormat;
+  final TimeFormatPB timeFormat;
   final bool isSelected;
-  final Function(TimeFormat format) onSelected;
+  final Function(TimeFormatPB format) onSelected;
   const TimeFormatCell({
     required this.timeFormat,
     required this.onSelected,
@@ -317,7 +313,7 @@ class TimeFormatCell extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget? checkmark;
     if (isSelected) {
-      checkmark = const FlowySvg(name: 'grid/checkmark');
+      checkmark = const FlowySvg(FlowySvgs.check_s);
     }
 
     return SizedBox(
@@ -331,12 +327,12 @@ class TimeFormatCell extends StatelessWidget {
   }
 }
 
-extension TimeFormatExtension on TimeFormat {
+extension TimeFormatExtension on TimeFormatPB {
   String title() {
     switch (this) {
-      case TimeFormat.TwelveHour:
+      case TimeFormatPB.TwelveHour:
         return LocaleKeys.grid_field_timeFormatTwelveHour.tr();
-      case TimeFormat.TwentyFourHour:
+      case TimeFormatPB.TwentyFourHour:
         return LocaleKeys.grid_field_timeFormatTwentyFourHour.tr();
       default:
         throw UnimplementedError;

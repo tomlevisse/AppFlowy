@@ -25,12 +25,14 @@ class HomeLayout {
 
     showEditPanel = homeSetting.panelContext.isSome();
 
-    menuWidth = Sizes.sideBarMed;
-    if (context.widthPx >= PageBreaks.desktop) {
-      menuWidth = Sizes.sideBarLg;
-    }
+    menuWidth = Sizes.sideBarWidth;
 
     menuWidth += homeSetting.resizeOffset;
+
+    final screenWidthPx = context.widthPx;
+    context
+        .read<HomeSettingBloc>()
+        .add(HomeSettingEvent.checkScreenSize(screenWidthPx));
 
     if (homeSetting.isMenuCollapsed) {
       showMenu = false;

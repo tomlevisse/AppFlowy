@@ -12,9 +12,9 @@ class TextCellBloc extends Bloc<TextCellEvent, TextCellState> {
     required this.cellController,
   }) : super(TextCellState.initial(cellController)) {
     on<TextCellEvent>(
-      (event, emit) async {
-        await event.when(
-          initial: () async {
+      (event, emit) {
+        event.when(
+          initial: () {
             _startListening();
           },
           updateText: (text) {
@@ -25,6 +25,12 @@ class TextCellBloc extends Bloc<TextCellEvent, TextCellState> {
           },
           didReceiveCellUpdate: (content) {
             emit(state.copyWith(content: content));
+          },
+          didUpdateEmoji: (String emoji) {
+            emit(state.copyWith(emoji: emoji));
+          },
+          enableEdit: (bool enabled) {
+            emit(state.copyWith(enableEdit: enabled));
           },
         );
       },
@@ -48,6 +54,11 @@ class TextCellBloc extends Bloc<TextCellEvent, TextCellState> {
           add(TextCellEvent.didReceiveCellUpdate(cellContent ?? ""));
         }
       }),
+      onRowMetaChanged: () {
+        if (!isClosed) {
+          add(TextCellEvent.didUpdateEmoji(cellController.emoji ?? ""));
+        }
+      },
     );
   }
 }
@@ -58,15 +69,21 @@ class TextCellEvent with _$TextCellEvent {
   const factory TextCellEvent.didReceiveCellUpdate(String cellContent) =
       _DidReceiveCellUpdate;
   const factory TextCellEvent.updateText(String text) = _UpdateText;
+  const factory TextCellEvent.enableEdit(bool enabled) = _EnableEdit;
+  const factory TextCellEvent.didUpdateEmoji(String emoji) = _UpdateEmoji;
 }
 
 @freezed
 class TextCellState with _$TextCellState {
   const factory TextCellState({
     required String content,
+    required String emoji,
+    required bool enableEdit,
   }) = _TextCellState;
 
   factory TextCellState.initial(TextCellController context) => TextCellState(
         content: context.getCellData() ?? "",
+        emoji: context.emoji ?? "",
+        enableEdit: false,
       );
 }
